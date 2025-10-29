@@ -26,47 +26,9 @@ struct ExecuteCommandArgs {
     command: String,
     #[serde(default)]
     args: Option<Vec<String>>,
-    /// Se true, executa o comando com sudo
-    #[serde(default)]
-    use_sudo: Option<bool>,
-    /// Senha do sudo (opcional, use apenas se necessário)
-    #[serde(default)]
-    sudo_password: Option<String>,
     /// Se true, usa PolicyKit (pkexec) para autenticação com interface gráfica
     #[serde(default)]
     use_polkit: Option<bool>,
-}
-
-/// Enum para definir o método de elevação de privilégios
-#[derive(Debug)]
-enum PrivilegeElevation {
-    None,
-    Sudo { password: Option<String> },
-    PolicyKit,
-}
-
-impl PrivilegeElevation {
-    fn from_args(args: &ExecuteCommandArgs) -> Self {
-        if args.use_polkit.unwrap_or(false) {
-            return PrivilegeElevation::PolicyKit;
-        }
-
-        if args.use_sudo.unwrap_or(false) {
-            return PrivilegeElevation::Sudo {
-                password: args.sudo_password.clone(),
-            };
-        }
-
-        PrivilegeElevation::None
-    }
-
-    fn description(&self) -> &'static str {
-        match self {
-            PrivilegeElevation::None => "normal",
-            PrivilegeElevation::Sudo { .. } => "sudo",
-            PrivilegeElevation::PolicyKit => "pkexec (PolicyKit)",
-        }
-    }
 }
 
 /// Servidor MCP Linux
@@ -206,23 +168,18 @@ impl LinuxMcpServer {
     /// Executa um comando no terminal
     #[tool(
         description = "Executa um comando no terminal e retorna o resultado incluindo stdout, stderr e código de saída. ATENÇÃO: Use com cuidado, pois pode executar qualquer comando no sistema. \
-        \n\nMétodos de autenticação disponíveis:\
+        \n\nMétodos de autenticação:\
         \n- Normal (padrão): executa com permissões do usuário atual\
-        \n- use_sudo=true: usa sudo (requer senha via sudo_password ou NOPASSWD configurado)\
-        \n- use_polkit=true: usa PolicyKit/pkexec com diálogo gráfico de autenticação (mais seguro)"
+        \n- use_polkit=true: usa PolicyKit/pkexec com diálogo gráfico nativo do sistema para autenticação (recomendado para comandos que precisam de root)"
     )]
     async fn execute_command(
         &self,
         Parameters(args): Parameters<ExecuteCommandArgs>,
     ) -> Result<CallToolResult, ErrorData> {
-        let elevation = PrivilegeElevation::from_args(&args);
-
-        match elevation {
-            PrivilegeElevation::None => self.execute_normal_command(&args).await,
-            PrivilegeElevation::Sudo { password } => {
-                self.execute_sudo_command(&args, password.as_deref()).await
-            }
-            PrivilegeElevation::PolicyKit => self.execute_polkit_command(&args).await,
+        if args.use_polkit.unwrap_or(false) {
+            self.execute_polkit_command(&args).await
+        } else {
+            self.execute_normal_command(&args).await
         }
     }
 
@@ -248,106 +205,6 @@ impl LinuxMcpServer {
         let result = json!({
             "command": format!("{} {}", args.command, args.args.clone().unwrap_or_default().join(" ")),
             "elevation_method": "none",
-            "exit_code": output.status.code().unwrap_or(-1),
-            "stdout": String::from_utf8_lossy(&output.stdout).to_string(),
-            "stderr": String::from_utf8_lossy(&output.stderr).to_string(),
-            "success": output.status.success(),
-        });
-
-        Ok(CallToolResult::success(vec![Content::text(
-            serde_json::to_string_pretty(&result).map_err(|e| {
-                ErrorData::new(
-                    ErrorCode::INTERNAL_ERROR,
-                    format!("Failed to serialize command result: {}", e),
-                    None,
-                )
-            })?,
-        )]))
-    }
-
-    /// Executa um comando com sudo
-    async fn execute_sudo_command(
-        &self,
-        args: &ExecuteCommandArgs,
-        password: Option<&str>,
-    ) -> Result<CallToolResult, ErrorData> {
-        let mut sudo_args = vec!["-S".to_string()]; // -S faz sudo ler senha do stdin
-        sudo_args.push(args.command.clone());
-        if let Some(cmd_args) = &args.args {
-            sudo_args.extend(cmd_args.clone());
-        }
-
-        let mut cmd = Command::new("sudo");
-        cmd.args(&sudo_args);
-
-        // Se temos senha sudo, configuramos stdin
-        if let Some(pwd) = password {
-            use std::io::Write;
-            use std::process::Stdio;
-
-            cmd.stdin(Stdio::piped());
-            cmd.stdout(Stdio::piped());
-            cmd.stderr(Stdio::piped());
-
-            let mut child = cmd.spawn().map_err(|e| {
-                ErrorData::new(
-                    ErrorCode::INTERNAL_ERROR,
-                    format!("Failed to spawn sudo command: {}", e),
-                    None,
-                )
-            })?;
-
-            // Envia a senha para o stdin
-            if let Some(mut stdin) = child.stdin.take() {
-                writeln!(stdin, "{}", pwd).map_err(|e| {
-                    ErrorData::new(
-                        ErrorCode::INTERNAL_ERROR,
-                        format!("Failed to write password to stdin: {}", e),
-                        None,
-                    )
-                })?;
-            }
-
-            let output = child.wait_with_output().map_err(|e| {
-                ErrorData::new(
-                    ErrorCode::INTERNAL_ERROR,
-                    format!("Failed to wait for sudo command: {}", e),
-                    None,
-                )
-            })?;
-
-            let result = json!({
-                "command": format!("sudo {} {}", args.command, args.args.clone().unwrap_or_default().join(" ")),
-                "elevation_method": "sudo",
-                "exit_code": output.status.code().unwrap_or(-1),
-                "stdout": String::from_utf8_lossy(&output.stdout).to_string(),
-                "stderr": String::from_utf8_lossy(&output.stderr).to_string(),
-                "success": output.status.success(),
-            });
-
-            return Ok(CallToolResult::success(vec![Content::text(
-                serde_json::to_string_pretty(&result).map_err(|e| {
-                    ErrorData::new(
-                        ErrorCode::INTERNAL_ERROR,
-                        format!("Failed to serialize command result: {}", e),
-                        None,
-                    )
-                })?,
-            )]));
-        }
-
-        // Execução sem senha (assume NOPASSWD configurado)
-        let output = cmd.output().map_err(|e| {
-            ErrorData::new(
-                ErrorCode::INTERNAL_ERROR,
-                format!("Failed to execute sudo command: {}", e),
-                None,
-            )
-        })?;
-
-        let result = json!({
-            "command": format!("sudo {} {}", args.command, args.args.clone().unwrap_or_default().join(" ")),
-            "elevation_method": "sudo",
             "exit_code": output.status.code().unwrap_or(-1),
             "stdout": String::from_utf8_lossy(&output.stdout).to_string(),
             "stderr": String::from_utf8_lossy(&output.stderr).to_string(),

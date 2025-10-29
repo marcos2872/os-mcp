@@ -1,6 +1,8 @@
 # Linux MCP Server
 
-Servidor MCP (Model Context Protocol) em Rust que fornece ferramentas para obter informações do sistema Linux e executar comandos no terminal.
+Servidor MCP (Model Context Protocol) em Rust que fornece ferramentas para obter informações do sistema Linux e executar comandos no terminal com **autenticação segura via PolicyKit**.
+
+> 🔐 **Segurança**: Este servidor usa PolicyKit (pkexec) para autenticação de comandos root - uma janela nativa do sistema pede sua senha, que nunca é exposta no MCP!
 
 ## 📖 Documentação
 
@@ -12,9 +14,9 @@ Servidor MCP (Model Context Protocol) em Rust que fornece ferramentas para obter
 
 ## ⚡ Quick Start - Executar comandos com root
 
-**Para executar comandos que precisam de permissões de administrador** (como `apt update`, `systemctl restart`, etc.), você DEVE adicionar um método de elevação:
+**Para executar comandos que precisam de permissões de administrador** (como `apt update`, `systemctl restart`, etc.), adicione `use_polkit: true`:
 
-### ✅ Método Recomendado: PolicyKit (janela gráfica nativa)
+### ✅ PolicyKit - Janela Gráfica Nativa do Sistema
 
 ```json
 {
@@ -27,7 +29,7 @@ Servidor MCP (Model Context Protocol) em Rust que fornece ferramentas para obter
 }
 ```
 
-**O que acontece**: Uma janela NATIVA do seu sistema operacional aparece pedindo senha (igual quando você instala programas). Sua senha **nunca é enviada pelo MCP**.
+**O que acontece**: Uma janela NATIVA do seu sistema operacional aparece pedindo senha (igual quando você instala programas). Sua senha **nunca é enviada pelo MCP** - o sistema operacional cuida da autenticação de forma segura.
 
 ### ⚠️ Erro Comum
 
@@ -64,10 +66,9 @@ Servidor MCP (Model Context Protocol) em Rust que fornece ferramentas para obter
 - **execute_command**: Executa comandos no terminal
   - Retorna stdout, stderr e código de saída
   - Suporta argumentos para comandos
-  - **3 métodos de elevação de privilégios**:
-    - **Normal**: executa com permissões do usuário atual
-    - **sudo** (`use_sudo: true`): usa sudo (requer senha ou NOPASSWD)
-    - **PolicyKit** (`use_polkit: true`): usa pkexec com diálogo gráfico (RECOMENDADO)
+  - **2 modos de execução**:
+    - **Normal** (padrão): executa com permissões do usuário atual
+    - **PolicyKit** (`use_polkit: true`): usa pkexec com diálogo gráfico nativo do sistema - RECOMENDADO para comandos que precisam de root
   - ⚠️ Use com cuidado - pode executar qualquer comando no sistema
 
 ## 📦 Compilação
@@ -104,11 +105,7 @@ O servidor se comunica via stdio (stdin/stdout) seguindo o protocolo MCP.
     "linux-mcp": {
       "command": "/caminho/completo/para/linux-mcp-wrapper.sh",
       "args": [],
-      "env": {
-        "DISPLAY": ":0",
-        "XAUTHORITY": "/home/seu_usuario/.Xauthority",
-        "DBUS_SESSION_BUS_ADDRESS": "unix:path=/run/user/1000/bus"
-      }
+      "env": {}
     }
   }
 }
@@ -146,11 +143,7 @@ nano .vscode/mcp.json
     "linux-mcp": {
       "command": "/home/marcos/Documents/Pessoal/linux-mcp/target/release/linux-mcp",
       "args": [],
-      "env": {
-        "DISPLAY": ":0",
-        "XAUTHORITY": "/home/marcos/.Xauthority",
-        "DBUS_SESSION_BUS_ADDRESS": "unix:path=/run/user/1000/bus"
-      }
+      "env": {}
     }
   }
 }
@@ -202,7 +195,7 @@ npx @modelcontextprotocol/inspector /caminho/completo/para/linux-mcp
 }
 ```
 
-### ⭐ Executar comando com PolicyKit (RECOMENDADO para root)
+### ⭐ Executar comando com PolicyKit (para comandos que precisam de root)
 
 ```json
 {
@@ -217,55 +210,9 @@ npx @modelcontextprotocol/inspector /caminho/completo/para/linux-mcp
 
 **Resultado**: Janela nativa do sistema pede senha → comando executado com segurança ✅
 
-### Executar comando com sudo (alternativa)
+**O que acontece**: Uma **janela gráfica oficial do sistema** aparece pedindo sua senha de administrador (igual quando você instala programas pela Central de Aplicativos).
 
-```json
-{
-  "name": "execute_command",
-  "arguments": {
-    "command": "systemctl",
-    "args": ["status", "nginx"],
-    "use_sudo": true
-  }
-}
-```
-
-**Nota**: Requer NOPASSWD configurado no sudoers ou fornecer `sudo_password`
-
-### Executar comando com sudo e senha
-
-```json
-{
-  "name": "execute_command",
-  "arguments": {
-    "command": "apt",
-    "args": ["update"],
-    "use_sudo": true,
-    "sudo_password": "sua_senha_aqui"
-  }
-}
-```
-
-⚠️ **Aviso de Segurança**: Fornecer a senha em texto plano é um risco de segurança. Use apenas em ambientes controlados e considere usar NOPASSWD no sudoers ou PolicyKit para ambientes de produção.
-
-### Executar comando com PolicyKit (RECOMENDADO) 🔐
-
-**PolicyKit abre uma janela NATIVA do sistema para autenticação** - não expõe sua senha!
-
-```json
-{
-  "name": "execute_command",
-  "arguments": {
-    "command": "apt",
-    "args": ["update"],
-    "use_polkit": true
-  }
-}
-```
-
-Quando executado, uma **janela gráfica oficial do sistema** aparecerá pedindo sua senha de administrador (igual quando você instala programas pela Central de Aplicativos).
-
-#### ⚠️ IMPORTANTE: Adicione `use_polkit: true` ou `use_sudo: true`
+#### ⚠️ IMPORTANTE: Adicione `use_polkit: true` para comandos root
 
 Comandos que precisam de root (como `apt update`, `systemctl restart`, etc.) **devem** incluir um método de elevação:
 
@@ -276,21 +223,21 @@ Comandos que precisam de root (como `apt update`, `systemctl restart`, etc.) **d
 
 ✅ **PolicyKit é mais seguro**: Apresenta um diálogo gráfico de autenticação e permite controle granular de permissões. Veja [Guia Completo de PolicyKit](examples/polkit/README_POLKIT.md) para instruções detalhadas.
 
-## 🔐 Configuração de Permissões Root
+## 🔐 PolicyKit - Autenticação Segura com Root
 
-Para executar comandos que precisam de permissões root, você tem 4 opções:
+PolicyKit é o sistema nativo do Linux para autenticação de privilégios administrativos.
 
-### Opção 1: PolicyKit/pkexec (⭐ RECOMENDADO)
+### ⭐ Por que usar PolicyKit?
 
-**A opção mais segura e moderna**. PolicyKit permite:
+### ⭐ Por que usar PolicyKit?
 
-- ✅ Diálogo gráfico de autenticação (não expõe senha)
-- ✅ Controle granular por comando e usuário
-- ✅ Auditoria completa no journal do sistema
-- ✅ Timeout automático de credenciais
-- ✅ Sem necessidade de configuração de sudoers
+- ✅ **Seguro**: Diálogo gráfico de autenticação - senha nunca exposta nos logs
+- ✅ **Controle granular**: Permissões por comando e usuário
+- ✅ **Auditoria**: Registro completo no journal do sistema
+- ✅ **Timeout automático**: Credenciais expiram automaticamente
+- ✅ **Nativo**: Interface oficial do seu desktop Linux (GNOME, KDE, XFCE, etc.)
 
-#### Instalação
+### 📦 Instalação
 
 ```bash
 # Ubuntu/Debian
@@ -303,7 +250,14 @@ sudo dnf install polkit
 sudo pacman -S polkit
 ```
 
-#### Uso Básico
+Verificar instalação:
+
+```bash
+which pkexec
+systemctl status polkit
+```
+
+### 🚀 Uso Básico
 
 ```json
 {
@@ -332,7 +286,7 @@ sudo pacman -S polkit
 
 ✅ **Sua senha nunca é enviada pelo MCP** - o sistema operacional cuida da autenticação!
 
-#### Configuração Avançada
+### ⚙️ Configuração Avançada (Opcional)
 
 Para permitir comandos específicos sem senha, crie regras personalizadas:
 
@@ -349,190 +303,7 @@ sudo systemctl restart polkit
 
 📖 **Guia Completo**: Veja [examples/polkit/README_POLKIT.md](examples/polkit/README_POLKIT.md) para instruções detalhadas, exemplos e solução de problemas.
 
-### Opção 2: Fornecer senha do sudo (use_sudo + sudo_password)
-
-### Opção 2: Fornecer senha do sudo (use_sudo + sudo_password)
-
-**⚠️ Menos seguro - use apenas em dev/teste**. Você pode passar a senha diretamente:
-
-```json
-{
-  "name": "execute_command",
-  "arguments": {
-    "command": "systemctl",
-    "args": ["restart", "nginx"],
-    "use_sudo": true,
-    "sudo_password": "sua_senha"
-  }
-}
-```
-
-⚠️ **Riscos**:
-
-- A senha fica exposta nos logs do MCP
-- Pode ser interceptada se a comunicação não estiver criptografada
-- **Use apenas em ambientes de desenvolvimento/teste**
-
-### Opção 3: Configurar sudo sem senha
-
-### Opção 3: Configurar sudo sem senha
-
-**Mais simples, mas menos granular que PolicyKit**. Edite o arquivo sudoers com `sudo visudo`:
-
-```bash
-# Permite que seu usuário execute comandos específicos sem senha
-seu_usuario ALL=(ALL) NOPASSWD: /usr/bin/systemctl, /usr/bin/apt, /usr/bin/docker
-
-# OU permite todos os comandos sem senha (menos seguro)
-seu_usuario ALL=(ALL) NOPASSWD: ALL
-```
-
-Depois use sem fornecer a senha:
-
-```json
-{
-  "name": "execute_command",
-  "arguments": {
-    "command": "systemctl",
-    "args": ["restart", "nginx"],
-    "use_sudo": true
-  }
-}
-```
-
-### Opção 4: Executar o servidor como root (❌ NÃO recomendado)
-
-```bash
-sudo ./target/release/linux-mcp
-```
-
-⚠️ **Atenção**: Executar como root é uma prática de segurança ruim. Use apenas em ambientes controlados.
-
 ---
-
-### 📊 Comparação de Métodos de Segurança
-
-| Método                  | Segurança      | Facilidade | Interface | Auditoria | Uso Recomendado                 |
-| ----------------------- | -------------- | ---------- | --------- | --------- | ------------------------------- |
-| **PolicyKit (pkexec)**  | 🟢 **Alta**    | ✅ Fácil   | Gráfica   | ✅ Sim    | **Produção (RECOMENDADO)**      |
-| senha via sudo_password | 🔴 Baixa       | ✅ Fácil   | Nenhuma   | ❌ Não    | Apenas dev/teste local          |
-| NOPASSWD no sudoers     | 🟡 Média       | ✅ Fácil   | Terminal  | 🟡 Básica | Produção (comandos específicos) |
-| Executar como root      | 🔴 Muito Baixa | ✅ Fácil   | Terminal  | ❌ Não    | **Nunca**                       |
-
-### 🎯 Quando usar cada método?
-
-#### Use PolicyKit quando:
-
-- ✅ Estiver em ambiente com interface gráfica
-- ✅ Precisar de controle granular de permissões
-- ✅ Quiser auditoria completa de comandos privilegiados
-- ✅ Não quiser expor senhas em logs
-
-#### Use sudo com NOPASSWD quando:
-
-- ✅ Estiver em servidor sem interface gráfica
-- ✅ Comandos específicos precisam rodar automaticamente
-- ✅ Ambiente controlado com poucos usuários
-
-#### Use sudo com senha quando:
-
-- ⚠️ Estiver em ambiente de desenvolvimento local
-- ⚠️ For apenas testar funcionalidade rapidamente
-- ❌ **NUNCA em produção ou ambientes compartilhados**
-
----
-
-### Exemplo completo com PolicyKit
-
-### Exemplo completo com PolicyKit
-
-Configure PolicyKit (veja guia completo em `examples/polkit/`):
-
-```bash
-sudo cp examples/polkit/50-linux-mcp.rules /etc/polkit-1/rules.d/
-sudo systemctl restart polkit
-```
-
-Ao chamar o tool `execute_command`, adicione `"use_polkit": true`:
-
-```json
-{
-  "name": "execute_command",
-  "arguments": {
-    "command": "systemctl",
-    "args": ["restart", "nginx"],
-    "use_polkit": true
-  }
-}
-```
-
-O comando será executado como: `pkexec systemctl restart nginx`
-
-Uma janela de autenticação aparecerá solicitando senha do administrador.
-
-### Exemplo com sudo (alternativa)
-
-Se preferir usar sudo, adicione `"use_sudo": true`:
-
-```json
-{
-  "name": "execute_command",
-  "arguments": {
-    "command": "apt",
-    "args": ["update"],
-    "use_sudo": true
-  }
-}
-```
-
-O comando será executado como: `sudo systemctl restart nginx`
-
----
-
-### Como funciona o PolicyKit?
-
-PolicyKit (pkexec) funciona de maneira diferente do sudo:
-
-1. **Cliente MCP** → envia `{"use_polkit": true}`
-2. **Servidor** inicia: `pkexec systemctl restart nginx`
-3. **PolicyKit** verifica regras em `/etc/polkit-1/rules.d/`
-4. Se permitido, **mostra diálogo gráfico** pedindo senha
-5. Usuário autentica → PolicyKit executa o comando
-6. **Resultado** retorna ao cliente
-
-**Vantagens**:
-
-- ✅ Senha nunca passa pela rede ou logs
-- ✅ Interface gráfica amigável
-- ✅ Credenciais podem ser "lembradas" por alguns minutos
-- ✅ Auditoria completa no journal: `journalctl -u polkit`
-
-### Como funciona o sudo com senha?
-
-Quando você fornece `sudo_password`, o servidor:
-
-1. Executa `sudo -S comando` (o flag `-S` faz sudo ler senha do stdin)
-2. Envia a senha pela entrada padrão do processo
-3. O sudo autentica e executa o comando
-4. Retorna o resultado normalmente
-
-**Exemplo de fluxo**:
-
-```
-Cliente MCP → {"use_sudo": true, "sudo_password": "senha"}
-           → Servidor inicia: sudo -S systemctl restart nginx
-           → Servidor envia: "senha\n" para stdin do sudo
-           → Sudo executa o comando
-           → Resultado retorna ao cliente
-```
-
-## 🛠️ Tecnologias Utilizadas
-
-- **rmcp**: SDK oficial do Model Context Protocol para Rust
-- **tokio**: Runtime assíncrono para Rust
-- **sysinfo**: Biblioteca para obter informações do sistema
-- **serde & serde_json**: Serialização/deserialização JSON
-- **anyhow**: Tratamento de erros
 
 ## 🔧 Troubleshooting PolicyKit
 
@@ -540,22 +311,7 @@ Cliente MCP → {"use_sudo": true, "sudo_password": "senha"}
 
 **Causa**: O MCP está rodando sem acesso à sessão gráfica.
 
-**Solução 1: Use o wrapper script** (recomendado)
-
-```bash
-# O wrapper já está incluído no projeto
-./linux-mcp-wrapper.sh
-```
-
-Configure no MCP para usar o wrapper:
-
-```json
-{
-  "command": "/caminho/completo/para/linux-mcp-wrapper.sh"
-}
-```
-
-**Solução 2: Configure variáveis de ambiente no MCP**
+**Solução 1: Configure variáveis de ambiente no MCP**
 
 ```json
 {
@@ -572,7 +328,7 @@ Configure no MCP para usar o wrapper:
 }
 ```
 
-**Solução 3: Verificar se o agente polkit está rodando**
+**Solução 2: Verificar se o agente polkit está rodando**
 
 ```bash
 # Verificar processo
@@ -638,7 +394,7 @@ journalctl -u polkit -f
 
 ### ❌ Problema: "Permission denied" ao executar comando
 
-**Causa**: Você esqueceu de adicionar `use_polkit: true` ou `use_sudo: true`.
+**Causa**: Você esqueceu de adicionar `use_polkit: true`.
 
 **Exemplo do erro**:
 
@@ -683,11 +439,20 @@ echo $DBUS_SESSION_BUS_ADDRESS
 
 ## ⚠️ Segurança
 
-O tool `execute_command` pode executar qualquer comando no sistema com as permissões do usuário que está executando o servidor. Use com responsabilidade:
+O tool `execute_command` pode executar qualquer comando no sistema.
 
-- Nunca execute o servidor com privilégios elevados (root) a menos que seja absolutamente necessário
-- Considere adicionar validação/whitelist de comandos para ambientes de produção
-- Monitore os logs e atividades do servidor
+**Segurança implementada**:
+
+- ✅ **PolicyKit**: Autenticação via janela nativa do sistema - senha nunca exposta
+- ✅ **Sem sudo/senha**: Nenhuma senha é armazenada ou transmitida pelo MCP
+- ✅ **Auditoria**: Todos os comandos com PolicyKit são registrados no journal do sistema
+
+**Boas práticas**:
+
+- Use PolicyKit (`use_polkit: true`) para todos os comandos que precisam de root
+- Configure regras do PolicyKit para comandos específicos (veja `examples/polkit/`)
+- Monitore logs: `journalctl -u polkit -f`
+- Nunca execute o servidor como root
 
 ## 📝 Licença
 
