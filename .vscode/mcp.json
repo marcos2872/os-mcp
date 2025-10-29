@@ -1,0 +1,11 @@
+{
+  "servers": {
+    "linux-mcp": {
+      "command": "${workspaceFolder}/../linux-mcp/target/release/linux-mcp",
+      "args": [],
+      "env": {
+        "RUST_LOG": "info"
+      },
+    }
+  }
+}
