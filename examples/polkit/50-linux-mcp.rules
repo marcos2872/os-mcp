@@ -1,0 +1,71 @@
+/* PolicyKit rules for Linux MCP Server
+ * 
+ * Este arquivo deve ser copiado para /etc/polkit-1/rules.d/
+ * sudo cp 50-linux-mcp.rules /etc/polkit-1/rules.d/
+ * 
+ * Reinicie o serviço polkit após as mudanças:
+ * sudo systemctl restart polkit
+ */
+
+/* Exemplo 1: Permitir que usuários do grupo 'admin' executem systemctl sem senha */
+polkit.addRule(function(action, subject) {
+    if (action.id == "org.freedesktop.systemd1.manage-units" &&
+        subject.isInGroup("admin")) {
+        return polkit.Result.YES;
+    }
+});
+
+/* Exemplo 2: Permitir comandos específicos do apt para um usuário */
+polkit.addRule(function(action, subject) {
+    if (action.id == "org.freedesktop.policykit.exec" &&
+        action.lookup("program") == "/usr/bin/apt" &&
+        subject.user == "seu_usuario") {
+        return polkit.Result.YES;
+    }
+});
+
+/* Exemplo 3: Permitir comandos docker para usuários do grupo docker */
+polkit.addRule(function(action, subject) {
+    if (action.id == "org.freedesktop.policykit.exec" &&
+        action.lookup("program") == "/usr/bin/docker" &&
+        subject.isInGroup("docker")) {
+        return polkit.Result.YES;
+    }
+});
+
+/* Exemplo 4: Permitir todos os comandos via pkexec para admin (com autenticação) */
+polkit.addRule(function(action, subject) {
+    if (action.id == "org.freedesktop.policykit.exec" &&
+        subject.isInGroup("admin")) {
+        return polkit.Result.AUTH_ADMIN_KEEP;
+    }
+});
+
+/* Exemplo 5: Permitir comandos específicos sem senha para um usuário específico */
+polkit.addRule(function(action, subject) {
+    if (action.id == "org.freedesktop.policykit.exec" &&
+        subject.user == "marcos") {
+        
+        var allowed_commands = [
+            "/usr/bin/systemctl",
+            "/usr/bin/journalctl",
+            "/usr/bin/apt",
+            "/usr/bin/docker",
+            "/usr/bin/ip"
+        ];
+        
+        var program = action.lookup("program");
+        if (allowed_commands.indexOf(program) !== -1) {
+            return polkit.Result.YES;
+        }
+    }
+});
+
+/* Resultado possíveis:
+ * - polkit.Result.YES: Permite sem autenticação
+ * - polkit.Result.NO: Nega a ação
+ * - polkit.Result.AUTH_ADMIN: Requer autenticação de admin
+ * - polkit.Result.AUTH_ADMIN_KEEP: Requer autenticação de admin (mantém por alguns minutos)
+ * - polkit.Result.AUTH_SELF: Requer autenticação do próprio usuário
+ * - polkit.Result.AUTH_SELF_KEEP: Requer autenticação do próprio usuário (mantém)
+ */
