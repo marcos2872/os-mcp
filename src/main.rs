@@ -11,6 +11,8 @@ use std::sync::Arc;
 use sysinfo::{Disks, System};
 use tokio::sync::Mutex;
 
+mod windows_elevation;
+
 /// Estrutura para os argumentos do tool de informações do sistema
 #[derive(Debug, Deserialize, Serialize, JsonSchema)]
 #[schemars(crate = "rmcp::schemars")]
@@ -26,20 +28,20 @@ struct ExecuteCommandArgs {
     command: String,
     #[serde(default)]
     args: Option<Vec<String>>,
-    /// Se true, usa PolicyKit (pkexec) para autenticação com interface gráfica
+    /// Se true, usa UAC (User Account Control) para autenticação com diálogo gráfico do Windows
     #[serde(default)]
-    use_polkit: Option<bool>,
+    use_elevation: Option<bool>,
 }
 
-/// Servidor MCP Linux
+/// Servidor MCP Windows
 #[derive(Clone)]
-pub struct LinuxMcpServer {
+pub struct WindowsMcpServer {
     tool_router: ToolRouter<Self>,
     system: Arc<Mutex<System>>,
 }
 
 #[tool_router]
-impl LinuxMcpServer {
+impl WindowsMcpServer {
     fn new() -> Self {
         Self {
             tool_router: Self::tool_router(),
@@ -47,9 +49,9 @@ impl LinuxMcpServer {
         }
     }
 
-    /// Obtém informações do sistema Linux
+    /// Obtém informações do sistema Windows
     #[tool(
-        description = "Obtém informações do sistema Linux como CPU, memória, discos e sistema operacional. Você pode especificar o tipo de informação: 'cpu', 'memory', 'disk', 'os' ou 'all' (padrão)."
+        description = "Obtém informações do sistema Windows como CPU, memória, discos e sistema operacional. Você pode especificar o tipo de informação: 'cpu', 'memory', 'disk', 'os' ou 'all' (padrão)."
     )]
     async fn get_system_info(
         &self,
@@ -167,17 +169,17 @@ impl LinuxMcpServer {
 
     /// Executa um comando no terminal
     #[tool(
-        description = "Executa um comando no terminal e retorna o resultado incluindo stdout, stderr e código de saída. ATENÇÃO: Use com cuidado, pois pode executar qualquer comando no sistema. \
-        \n\nMétodos de autenticação:\
+        description = "Executa um comando no terminal Windows e retorna o resultado incluindo stdout, stderr e código de saída. ATENÇÃO: Use com cuidado, pois pode executar qualquer comando no sistema. \
+        \n\nMétodos de execução:\
         \n- Normal (padrão): executa com permissões do usuário atual\
-        \n- use_polkit=true: usa PolicyKit/pkexec com diálogo gráfico nativo do sistema para autenticação (recomendado para comandos que precisam de root)"
+        \n- use_elevation=true: usa UAC (User Account Control) com diálogo gráfico nativo do Windows para autenticação (recomendado para comandos que precisam de administrador)"
     )]
     async fn execute_command(
         &self,
         Parameters(args): Parameters<ExecuteCommandArgs>,
     ) -> Result<CallToolResult, ErrorData> {
-        if args.use_polkit.unwrap_or(false) {
-            self.execute_polkit_command(&args).await
+        if args.use_elevation.unwrap_or(false) {
+            self.execute_elevated_command(&args).await
         } else {
             self.execute_normal_command(&args).await
         }
@@ -222,65 +224,48 @@ impl LinuxMcpServer {
         )]))
     }
 
-    /// Executa um comando usando PolicyKit (pkexec)
-    /// PolicyKit apresenta uma interface gráfica de autenticação e é mais seguro
-    async fn execute_polkit_command(
+    /// Executa um comando usando UAC (User Account Control) do Windows
+    /// UAC apresenta um diálogo gráfico de autenticação padrão do Windows
+    async fn execute_elevated_command(
         &self,
         args: &ExecuteCommandArgs,
     ) -> Result<CallToolResult, ErrorData> {
-        // Verificar se pkexec está disponível
-        if Command::new("which")
-            .arg("pkexec")
-            .output()
-            .map(|o| !o.status.success())
-            .unwrap_or(true)
-        {
-            return Err(ErrorData::new(
-                ErrorCode::INTERNAL_ERROR,
-                "PolicyKit (pkexec) não está instalado no sistema. Instale o pacote 'polkit' para usar este recurso.".to_string(),
-                None,
-            ));
-        }
-
-        let mut pkexec_args = vec![args.command.clone()];
-        if let Some(cmd_args) = &args.args {
-            pkexec_args.extend(cmd_args.clone());
-        }
-
-        let mut cmd = Command::new("pkexec");
-        cmd.args(&pkexec_args);
-
-        // Importante: pkexec precisa de um ambiente gráfico ou dbus para funcionar
-        // Define variáveis de ambiente necessárias
-        if let Ok(display) = std::env::var("DISPLAY") {
-            cmd.env("DISPLAY", display);
-        }
-        if let Ok(xauth) = std::env::var("XAUTHORITY") {
-            cmd.env("XAUTHORITY", xauth);
-        }
-        if let Ok(wayland) = std::env::var("WAYLAND_DISPLAY") {
-            cmd.env("WAYLAND_DISPLAY", wayland);
-        }
-
-        let output = cmd.output().map_err(|e| {
+        let command = args.command.clone();
+        let cmd_args = args.args.clone();
+        
+        // Executar em uma thread bloqueante para não bloquear o runtime assíncrono
+        let result = tokio::task::spawn_blocking(move || {
+            windows_elevation::execute_elevated(&command, cmd_args.as_ref())
+        })
+        .await
+        .map_err(|e| {
             ErrorData::new(
                 ErrorCode::INTERNAL_ERROR,
-                format!("Failed to execute pkexec command: {}. Certifique-se de que você está em um ambiente gráfico com D-Bus rodando.", e),
+                format!("Failed to spawn elevation task: {}", e),
+                None,
+            )
+        })?
+        .map_err(|e| {
+            ErrorData::new(
+                ErrorCode::INTERNAL_ERROR,
+                format!("Failed to execute elevated command: {}. Make sure you're running in an environment with UAC enabled.", e),
                 None,
             )
         })?;
 
-        let result = json!({
-            "command": format!("pkexec {} {}", args.command, args.args.clone().unwrap_or_default().join(" ")),
-            "elevation_method": "pkexec (PolicyKit)",
-            "exit_code": output.status.code().unwrap_or(-1),
-            "stdout": String::from_utf8_lossy(&output.stdout).to_string(),
-            "stderr": String::from_utf8_lossy(&output.stderr).to_string(),
-            "success": output.status.success(),
+        let (exit_code, stdout, stderr, success) = result;
+
+        let result_json = json!({
+            "command": format!("{} {}", args.command, args.args.clone().unwrap_or_default().join(" ")),
+            "elevation_method": "UAC (User Account Control)",
+            "exit_code": exit_code,
+            "stdout": stdout,
+            "stderr": stderr,
+            "success": success,
         });
 
         Ok(CallToolResult::success(vec![Content::text(
-            serde_json::to_string_pretty(&result).map_err(|e| {
+            serde_json::to_string_pretty(&result_json).map_err(|e| {
                 ErrorData::new(
                     ErrorCode::INTERNAL_ERROR,
                     format!("Failed to serialize command result: {}", e),
@@ -292,18 +277,20 @@ impl LinuxMcpServer {
 }
 
 #[tool_handler]
-impl ServerHandler for LinuxMcpServer {
+impl ServerHandler for WindowsMcpServer {
     fn get_info(&self) -> ServerInfo {
         ServerInfo {
             protocol_version: ProtocolVersion::V_2024_11_05,
             capabilities: ServerCapabilities::builder().enable_tools().build(),
             server_info: Implementation::from_build_env(),
             instructions: Some(
-                "Este servidor MCP fornece ferramentas para obter informações do sistema Linux \
+                "Este servidor MCP fornece ferramentas para obter informações do sistema Windows \
                  e executar comandos no terminal.\n\n\
                  Ferramentas disponíveis:\n\
                  - get_system_info: Obtém informações sobre CPU, memória, discos ou sistema operacional\n\
-                 - execute_command: Executa comandos no terminal e retorna o resultado"
+                 - execute_command: Executa comandos no terminal e retorna o resultado\n\n\
+                 Para executar comandos que precisam de privilégios de administrador, use 'use_elevation: true' \
+                 para acionar o UAC (User Account Control) do Windows."
                     .to_string(),
             ),
         }
@@ -313,7 +300,7 @@ impl ServerHandler for LinuxMcpServer {
 #[tokio::main]
 async fn main() -> Result<()> {
     // Criar o servidor
-    let server = LinuxMcpServer::new();
+    let server = WindowsMcpServer::new();
 
     // Criar transporte stdio (stdin/stdout)
     let transport = (tokio::io::stdin(), tokio::io::stdout());
