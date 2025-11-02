@@ -81,6 +81,12 @@ O executável será gerado em `target\release\windows-mcp.exe`.
 
 ## 🔧 Uso
 
+### Pré-requisitos para execução
+
+- **Visual C++ Redistributable** (necessário para executar o binário):
+  - Baixe e instale o `vc_redist.x64.exe` em: [https://learn.microsoft.com/pt-br/cpp/windows/latest-supported-vc-redist?view=msvc-170](https://learn.microsoft.com/pt-br/cpp/windows/latest-supported-vc-redist?view=msvc-170)
+  - Caso não tenha instalado, você verá erros de DLLs faltando ao executar o `windows-mcp.exe`
+
 ### Executar o servidor
 
 ```powershell
