@@ -1,109 +1,115 @@
-# Linux MCP Server
+# Windows MCP Server
 
-Servidor MCP (Model Context Protocol) em Rust que fornece ferramentas para obter informações do sistema Linux e executar comandos no terminal com **autenticação segura via PolicyKit**.
+Servidor MCP (Model Context Protocol) em Rust que fornece ferramentas para obter informações do sistema Windows e executar comandos no terminal com autenticação segura via UAC.
 
-> 🔐 **Segurança**: Este servidor usa PolicyKit (pkexec) para autenticação de comandos root - uma janela nativa do sistema pede sua senha, que nunca é exposta no MCP!
+> 🔐 Segurança: Este servidor usa UAC (User Account Control) para autenticação de comandos administrativos — uma janela nativa do Windows pede sua permissão; nada é exposto ao MCP.
 
-## 📖 Documentação
+## 📖 Índice
 
-- 🚀 **[Configurar no Claude Desktop](CLAUDE_DESKTOP_SETUP.md)** - Guia passo a passo completo
-- 📋 **[Referência Rápida](QUICK_REFERENCE.md)** - Exemplos prontos de uso
-- 🔐 **[Guia PolicyKit](examples/polkit/README_POLKIT.md)** - Configuração de segurança avançada
+- ⚡ Quick Start
+- 🚀 Funcionalidades
+- 📦 Compilação (Windows)
+- 🔧 Uso
+- 📚 Exemplos de Uso
+- 🔐 UAC - Autenticação Segura
+- 🔧 Troubleshooting
+- ⚠️ Segurança
 
 ---
 
-## ⚡ Quick Start - Executar comandos com root
+## ⚡ Quick Start — Executar comandos com administrador
 
-**Para executar comandos que precisam de permissões de administrador** (como `apt update`, `systemctl restart`, etc.), adicione `use_polkit: true`:
-
-### ✅ PolicyKit - Janela Gráfica Nativa do Sistema
+Para executar comandos que precisam de permissões de administrador (instalar software, gerenciar serviços, etc.), adicione `use_elevation: true`:
 
 ```json
 {
   "name": "execute_command",
   "arguments": {
-    "command": "apt",
-    "args": ["update"],
-    "use_polkit": true
+    "command": "net",
+    "args": ["start", "W3SVC"],
+    "use_elevation": true
   }
 }
 ```
 
-**O que acontece**: Uma janela NATIVA do seu sistema operacional aparece pedindo senha (igual quando você instala programas). Sua senha **nunca é enviada pelo MCP** - o sistema operacional cuida da autenticação de forma segura.
+O que acontece: uma janela NATIVA do Windows aparece pedindo permissão de administrador (UAC). Sua autorização não é enviada pelo MCP — o Windows cuida de tudo com segurança.
 
-### ⚠️ Erro Comum
+Erro comum:
 
-❌ **ERRADO** (vai falhar com "Permission denied"):
-
-```json
-{
-  "command": "apt",
-  "args": ["update"]
-}
-```
-
-✅ **CORRETO** (adicione `use_polkit: true`):
-
-```json
-{
-  "command": "apt",
-  "args": ["update"],
-  "use_polkit": true
-}
-```
+- ❌ Errado (vai falhar com "Access is denied"): sem `use_elevation: true`.
+- ✅ Certo: inclua `use_elevation: true`.
 
 ---
 
 ## 🚀 Funcionalidades
 
-- **get_system_info**: Obtém informações detalhadas do sistema
-
+- get_system_info: informações detalhadas do sistema
   - CPU (contagem, marca, uso)
   - Memória (total, usada, disponível, swap)
-  - Discos (espaço total, disponível, sistema de arquivos)
-  - Sistema Operacional (nome, versão do kernel, hostname)
-
-- **execute_command**: Executa comandos no terminal
+  - Discos (espaço total, disponível; drives C:\, D:\, etc.)
+  - Sistema Operacional (nome, versão, hostname)
+- execute_command: executa comandos no terminal Windows
   - Retorna stdout, stderr e código de saída
-  - Suporta argumentos para comandos
-  - **2 modos de execução**:
-    - **Normal** (padrão): executa com permissões do usuário atual
-    - **PolicyKit** (`use_polkit: true`): usa pkexec com diálogo gráfico nativo do sistema - RECOMENDADO para comandos que precisam de root
-  - ⚠️ Use com cuidado - pode executar qualquer comando no sistema
+  - Suporta argumentos
+  - Modos de execução:
+    - Normal (padrão): permissões do usuário atual
+    - UAC (`use_elevation: true`): diálogo gráfico nativo do Windows (recomendado para comandos administrativos)
 
-## 📦 Compilação
+## 📦 Compilação (Windows)
 
-```bash
+### Pré-requisitos
+
+- Windows 10/11 ou Windows Server 2016+
+- Rust (via rustup)
+- Um toolchain C/C++ para linkedição:
+  - Opção A — MSVC (recomendado):
+    - Instale "Visual Studio Build Tools" com a carga de trabalho "Desktop development with C++" (inclui `link.exe`).
+    - Toolchain Rust: `stable-x86_64-pc-windows-msvc` (padrão em máquinas Windows).
+  - Opção B — GNU (alternativa):
+    - Instale o MSYS2 e o pacote `mingw-w64-x86_64-toolchain` (fornece `gcc.exe`).
+    - Configure o PATH para incluir `C:\msys64\mingw64\bin` e, se desejar, force `x86_64-pc-windows-gnu` no Cargo.
+
+> Dica: Se você ver o erro "linker `link.exe` not found", instale os Visual C++ Build Tools (opção A) ou mude para o toolchain GNU com MSYS2 (opção B). Veja Troubleshooting.
+
+### Compilar o projeto
+
+```powershell
 cargo build --release
 ```
 
-O binário será gerado em `target/release/linux-mcp`
+O executável será gerado em `target\release\windows-mcp.exe`.
 
 ## 🔧 Uso
 
 ### Executar o servidor
 
-```bash
-./target/release/linux-mcp
+```powershell
+.\u200Btarget\release\windows-mcp.exe
 ```
 
 O servidor se comunica via stdio (stdin/stdout) seguindo o protocolo MCP.
 
 ### Integração com Claude Desktop
 
-> 🤖 **Guia Detalhado**: Veja [CLAUDE_DESKTOP_SETUP.md](CLAUDE_DESKTOP_SETUP.md) para instruções passo a passo completas!
+1. Compile o binário:
 
-**Resumo rápido**:
+```powershell
+cargo build --release
+```
 
-1. Compilar: `cargo build --release`
-2. Editar: `~/.config/Claude/claude_desktop_config.json` (Linux)
-3. Adicionar configuração:
+2. Edite a configuração em:
+
+```
+%APPDATA%\Claude\claude_desktop_config.json
+```
+
+3. Adicione a configuração do servidor:
 
 ```json
 {
   "mcpServers": {
-    "linux-mcp": {
-      "command": "/caminho/completo/para/linux-mcp-wrapper.sh",
+    "windows-mcp": {
+      "command": "C:\\caminho\\completo\\para\\windows-mcp.exe",
       "args": [],
       "env": {}
     }
@@ -111,37 +117,29 @@ O servidor se comunica via stdio (stdin/stdout) seguindo o protocolo MCP.
 }
 ```
 
-4. Reiniciar Claude Desktop completamente
+4. Reinicie o Claude Desktop completamente e verifique o ícone 🔌 no chat.
 
-**Caminhos de configuração**:
+### Integração com VS Code / Cursor IDE
 
-- Linux: `~/.config/Claude/claude_desktop_config.json`
-- macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
-- Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+Configuração por projeto:
 
-### Integração com Cursor IDE / VS Code
+```powershell
+# VS Code
+mkdir .vscode
+notepad .vscode\mcp.json
 
-#### Opção 1: Configuração por projeto
-
-Crie o arquivo `.cursor/mcp_config.json` (Cursor) ou `.vscode/mcp.json` (VS Code) na raiz do seu projeto:
-
-```bash
-# Para Cursor
-mkdir -p .cursor
-nano .cursor/mcp_config.json
-
-# Para VS Code
-mkdir -p .vscode
-nano .vscode/mcp.json
+# Cursor
+mkdir .cursor
+notepad .cursor\mcp_config.json
 ```
 
-**Conteúdo do arquivo**:
+Conteúdo sugerido:
 
 ```json
 {
   "mcpServers": {
-    "linux-mcp": {
-      "command": "/home/marcos/Documents/Pessoal/linux-mcp/target/release/linux-mcp",
+    "windows-mcp": {
+      "command": "C:\\Users\\Marcos\\Documents\\windows-mcp\\target\\release\\windows-mcp.exe",
       "args": [],
       "env": {}
     }
@@ -149,291 +147,133 @@ nano .vscode/mcp.json
 }
 ```
 
-#### Opção 2: Configuração global
+Configuração global:
 
-Configure globalmente em `~/.config/cursor/mcp_config.json` ou `~/.config/Code/User/mcp.json`
+- VS Code: `%APPDATA%\Code\User\mcp.json`
+- Cursor: `%APPDATA%\Cursor\User\mcp_config.json`
 
 ### Testar com MCP Inspector
 
-```bash
-npx @modelcontextprotocol/inspector /caminho/completo/para/linux-mcp
+```powershell
+npx @modelcontextprotocol/inspector C:\caminho\completo\para\windows-mcp.exe
 ```
 
 ## 📚 Exemplos de Uso
 
-### Obter informações completas do sistema
+Obter tudo:
 
 ```json
 {
   "name": "get_system_info",
-  "arguments": {
-    "info_type": "all"
-  }
+  "arguments": { "info_type": "all" }
 }
 ```
 
-### Obter apenas informações de CPU
+Somente CPU:
 
 ```json
 {
   "name": "get_system_info",
-  "arguments": {
-    "info_type": "cpu"
-  }
+  "arguments": { "info_type": "cpu" }
 }
 ```
 
-### Executar comando normal (sem root)
+Somente discos:
+
+```json
+{
+  "name": "get_system_info",
+  "arguments": { "info_type": "disk" }
+}
+```
+
+Comando normal (sem administrador):
 
 ```json
 {
   "name": "execute_command",
   "arguments": {
-    "command": "ls",
-    "args": ["-la", "/home"]
+    "command": "dir",
+    "args": ["C:\\Users"]
   }
 }
 ```
 
-### ⭐ Executar comando com PolicyKit (para comandos que precisam de root)
+Comando PowerShell:
 
 ```json
 {
   "name": "execute_command",
   "arguments": {
-    "command": "apt",
-    "args": ["update"],
-    "use_polkit": true
+    "command": "powershell",
+    "args": ["-Command", "Get-Process | Select-Object -First 5"]
   }
 }
 ```
 
-**Resultado**: Janela nativa do sistema pede senha → comando executado com segurança ✅
-
-**O que acontece**: Uma **janela gráfica oficial do sistema** aparece pedindo sua senha de administrador (igual quando você instala programas pela Central de Aplicativos).
-
-#### ⚠️ IMPORTANTE: Adicione `use_polkit: true` para comandos root
-
-Comandos que precisam de root (como `apt update`, `systemctl restart`, etc.) **devem** incluir um método de elevação:
-
-| Comando sem elevação ❌                                | Comando correto ✅                                                         |
-| ------------------------------------------------------ | -------------------------------------------------------------------------- |
-| `"command": "apt", "args": ["update"]`                 | `"command": "apt", "args": ["update"], "use_polkit": true`                 |
-| `"command": "systemctl", "args": ["restart", "nginx"]` | `"command": "systemctl", "args": ["restart", "nginx"], "use_polkit": true` |
-
-✅ **PolicyKit é mais seguro**: Apresenta um diálogo gráfico de autenticação e permite controle granular de permissões. Veja [Guia Completo de PolicyKit](examples/polkit/README_POLKIT.md) para instruções detalhadas.
-
-## 🔐 PolicyKit - Autenticação Segura com Root
-
-PolicyKit é o sistema nativo do Linux para autenticação de privilégios administrativos.
-
-### ⭐ Por que usar PolicyKit?
-
-### ⭐ Por que usar PolicyKit?
-
-- ✅ **Seguro**: Diálogo gráfico de autenticação - senha nunca exposta nos logs
-- ✅ **Controle granular**: Permissões por comando e usuário
-- ✅ **Auditoria**: Registro completo no journal do sistema
-- ✅ **Timeout automático**: Credenciais expiram automaticamente
-- ✅ **Nativo**: Interface oficial do seu desktop Linux (GNOME, KDE, XFCE, etc.)
-
-### 📦 Instalação
-
-```bash
-# Ubuntu/Debian
-sudo apt install polkitd policykit-1
-
-# Fedora/RHEL
-sudo dnf install polkit
-
-# Arch Linux
-sudo pacman -S polkit
-```
-
-Verificar instalação:
-
-```bash
-which pkexec
-systemctl status polkit
-```
-
-### 🚀 Uso Básico
+Comando com UAC (administrador):
 
 ```json
 {
   "name": "execute_command",
   "arguments": {
-    "command": "systemctl",
-    "args": ["restart", "nginx"],
-    "use_polkit": true
+    "command": "net",
+    "args": ["start", "W3SVC"],
+    "use_elevation": true
   }
 }
 ```
 
-**O que acontece:**
+Exemplos que exigem elevação:
 
-1. O MCP executa `pkexec systemctl restart nginx`
-2. Uma **janela NATIVA do seu sistema operacional** aparece (não é customizada - é a oficial do Linux)
-3. Você digita sua senha de administrador
-4. O PolicyKit valida e executa o comando com privilégios
-5. O resultado retorna para o MCP
-
-**Aparência da janela:**
-
-- **GNOME/Ubuntu**: Janela com escudo vermelho/amarelo "Authentication Required"
-- **KDE Plasma**: Diálogo azul do KDE Polkit Agent
-- **XFCE/MATE**: Janela simples do ambiente específico
-
-✅ **Sua senha nunca é enviada pelo MCP** - o sistema operacional cuida da autenticação!
-
-### ⚙️ Configuração Avançada (Opcional)
-
-Para permitir comandos específicos sem senha, crie regras personalizadas:
-
-```bash
-# Copiar arquivo de exemplo
-sudo cp examples/polkit/50-linux-mcp.rules /etc/polkit-1/rules.d/
-
-# Editar para seu usuário
-sudo nano /etc/polkit-1/rules.d/50-linux-mcp.rules
-
-# Reiniciar polkit
-sudo systemctl restart polkit
-```
-
-📖 **Guia Completo**: Veja [examples/polkit/README_POLKIT.md](examples/polkit/README_POLKIT.md) para instruções detalhadas, exemplos e solução de problemas.
+| Comando                                                                                 | Descrição                        |
+| --------------------------------------------------------------------------------------- | -------------------------------- |
+| `"command": "net", "args": ["start", "W3SVC"], "use_elevation": true`                   | Iniciar serviço IIS              |
+| `"command": "sc", "args": ["query", "wuauserv"], "use_elevation": true`                 | Verificar serviço Windows Update |
+| `"command": "reg", "args": ["query", "HKLM\\SOFTWARE"], "use_elevation": true`          | Ler registro do sistema          |
+| `"command": "netsh", "args": ["interface", "show", "interface"], "use_elevation": true` | Ver interfaces de rede           |
 
 ---
 
-## 🔧 Troubleshooting PolicyKit
+## 🔐 UAC — Autenticação Segura no Windows
 
-### ❌ Problema: Janela de autenticação não aparece
+UAC (User Account Control) é o sistema nativo do Windows para autenticação de privilégios administrativos.
 
-**Causa**: O MCP está rodando sem acesso à sessão gráfica.
+Por que usar UAC?
 
-**Solução 1: Configure variáveis de ambiente no MCP**
-
-```json
-{
-  "mcpServers": {
-    "linux-mcp": {
-      "command": "/caminho/para/linux-mcp",
-      "env": {
-        "DISPLAY": ":0",
-        "XAUTHORITY": "/home/seu_usuario/.Xauthority",
-        "DBUS_SESSION_BUS_ADDRESS": "unix:path=/run/user/1000/bus"
-      }
-    }
-  }
-}
-```
-
-**Solução 2: Verificar se o agente polkit está rodando**
-
-```bash
-# Verificar processo
-ps aux | grep polkit
-
-# Iniciar manualmente (GNOME/Ubuntu)
-/usr/libexec/polkit-gnome-authentication-agent-1 &
-
-# Iniciar manualmente (KDE)
-/usr/lib/polkit-kde-authentication-agent-1 &
-```
+- Seguro: diálogo gráfico de autenticação; permissão nunca exposta nos logs
+- Controle: aceitar ou negar cada solicitação
+- Auditoria: registros no Event Viewer
+- Nativo: interface oficial do Windows
 
 ---
 
-### ❌ Problema: Erro "PolicyKit (pkexec) não está instalado"
+## 🔧 Troubleshooting
 
-**Solução**: Instalar PolicyKit
+### "linker `link.exe` not found"
 
-```bash
-# Ubuntu/Debian
-sudo apt install policykit-1 polkitd
+- Instale os Visual Studio Build Tools (C++). Depois, reabra o terminal/VS Code.
+- Alternativa: use o toolchain GNU com MSYS2 (`mingw-w64-x86_64-toolchain`) e garanta `C:\msys64\mingw64\bin` no PATH. Opcionalmente, crie `.cargo\config.toml` com:
 
-# Fedora/RHEL
-sudo dnf install polkit
+```toml
+[build]
+target = "x86_64-pc-windows-gnu"
 
-# Arch Linux
-sudo pacman -S polkit
+[target.x86_64-pc-windows-gnu]
+linker = "gcc"
 ```
 
-Verificar instalação:
+### Diálogo UAC não aparece
 
-```bash
-which pkexec
-systemctl status polkit
-```
+- Verifique se o UAC está ativado (EnableLUA=1). Painel de Controle → Contas de Usuário → Controle de Conta de Usuário.
 
----
+### "Access denied"/"Permission denied"
 
-### ❌ Problema: Erro "Not authorized" ou "Authentication failed"
+- Inclua `use_elevation: true` ao executar comandos administrativos.
 
-**Causa**: Seu usuário não tem permissão ou as regras do PolicyKit bloquearam.
+### Claude Desktop não detecta o servidor
 
-**Solução**: Configurar regras do PolicyKit
-
-```bash
-# Copiar regras de exemplo
-sudo cp examples/polkit/50-linux-mcp.rules /etc/polkit-1/rules.d/
-
-# Editar e substituir "marcos" pelo seu usuário
-sudo nano /etc/polkit-1/rules.d/50-linux-mcp.rules
-
-# Reiniciar polkit
-sudo systemctl restart polkit
-```
-
-**Ver logs de erro**:
-
-```bash
-journalctl -u polkit -f
-```
-
----
-
-### ❌ Problema: "Permission denied" ao executar comando
-
-**Causa**: Você esqueceu de adicionar `use_polkit: true`.
-
-**Exemplo do erro**:
-
-```json
-{
-  "exit_code": 100,
-  "stderr": "E: Could not open lock file - open (13: Permission denied)",
-  "elevation_method": "none"
-}
-```
-
-**Solução**: Adicionar método de elevação:
-
-```json
-{
-  "command": "apt",
-  "args": ["update"],
-  "use_polkit": true // ← ADICIONE ISSO!
-}
-```
-
----
-
-### 🔍 Debug: Ver o que está acontecendo
-
-```bash
-# Ver logs do PolicyKit em tempo real
-journalctl -u polkit -f
-
-# Testar pkexec manualmente no terminal
-pkexec systemctl status nginx
-
-# Ver todas as ações disponíveis do PolicyKit
-pkaction
-
-# Verificar variáveis de ambiente
-echo $DISPLAY
-echo $DBUS_SESSION_BUS_ADDRESS
-```
+- Caminho incorreto ou JSON inválido. Use `\\` nos caminhos e valide o JSON. Reinicie o app completamente.
 
 ---
 
@@ -441,23 +281,35 @@ echo $DBUS_SESSION_BUS_ADDRESS
 
 O tool `execute_command` pode executar qualquer comando no sistema.
 
-**Segurança implementada**:
+- UAC: autenticação via janela nativa — nenhuma credencial é armazenada
+- Auditoria: comandos elevados são registrados no Event Viewer
+- Boas práticas: use `use_elevation: true` quando necessário; nunca mantenha o servidor sempre elevado
 
-- ✅ **PolicyKit**: Autenticação via janela nativa do sistema - senha nunca exposta
-- ✅ **Sem sudo/senha**: Nenhuma senha é armazenada ou transmitida pelo MCP
-- ✅ **Auditoria**: Todos os comandos com PolicyKit são registrados no journal do sistema
+---
 
-**Boas práticas**:
+## 📝 Compatibilidade
 
-- Use PolicyKit (`use_polkit: true`) para todos os comandos que precisam de root
-- Configure regras do PolicyKit para comandos específicos (veja `examples/polkit/`)
-- Monitore logs: `journalctl -u polkit -f`
-- Nunca execute o servidor como root
+- Windows 10 (1809+), Windows 11, Windows Server 2016+
+
+---
 
 ## 📝 Licença
 
-Este projeto é de código aberto e está disponível sob a licença MIT.
+Projeto sob licença MIT.
 
 ## 🤝 Contribuindo
 
-Contribuições são bem-vindas! Sinta-se à vontade para abrir issues ou pull requests.
+Contribuições são bem-vindas! Abra issues ou pull requests.
+
+---
+
+## 🆚 Diferenças rápidas (Linux x Windows)
+
+| Recurso                 | Linux MCP          | Windows MCP                |
+| ----------------------- | ------------------ | -------------------------- |
+| Elevação de privilégios | PolicyKit (pkexec) | UAC (User Account Control) |
+| Shell padrão            | bash               | cmd.exe / PowerShell       |
+| Formato de caminhos     | `/home/user`       | `C:\\Users\\user`          |
+| Logs de auditoria       | journalctl         | Event Viewer               |
+
+Links úteis: UAC, MCP, Claude Desktop.
