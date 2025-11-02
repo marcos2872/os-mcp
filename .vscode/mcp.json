@@ -1,7 +1,7 @@
 {
   "servers": {
     "linux-mcp": {
-      "command": "/home/marcos/Documents/linux-mcp/target/release/linux-mcp",
+      "command": "C:\\Users\\marcos\\Documents\\linux-mcp\\target\\debug\\windows-mcp.exe",
       "args": [],
       "env": {}
     }
