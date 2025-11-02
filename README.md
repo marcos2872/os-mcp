@@ -56,6 +56,8 @@ Servidor MCP (Model Context Protocol) em Rust que fornece ferramentas para obter
 
 ## 🚀 Funcionalidades
 
+### 🛠️ Tools (Ferramentas)
+
 - **get_system_info**: Obtém informações detalhadas do sistema
 
   - CPU (contagem, marca, uso)
@@ -70,6 +72,26 @@ Servidor MCP (Model Context Protocol) em Rust que fornece ferramentas para obter
     - **Normal** (padrão): executa com permissões do usuário atual
     - **PolicyKit** (`use_polkit: true`): usa pkexec com diálogo gráfico nativo do sistema - RECOMENDADO para comandos que precisam de root
   - ⚠️ Use com cuidado - pode executar qualquer comando no sistema
+
+### 📚 Resources (Recursos de Leitura)
+
+Acesso rápido a informações do sistema sem executar comandos:
+
+- **`linux://logs/system`** - Últimas 100 linhas dos logs do sistema (journalctl)
+- **`linux://logs/auth`** - Últimas 50 linhas dos logs de autenticação SSH
+- **`linux://config/network`** - Configuração de rede atual (ip addr show)
+- **`linux://processes/top`** - Top 10 processos por uso de memória
+- **`linux://system/status`** - Status geral do sistema (CPU, memória, uptime)
+
+### 💡 Prompts (Fluxos Interativos)
+
+Guias assistidos para tarefas comuns de administração:
+
+- **`system_troubleshooting`** - Diagnóstico interativo de problemas (CPU, memória, disco, rede, processos)
+- **`security_audit`** - Auditoria de segurança do sistema (escopo básico ou completo)
+- **`service_management`** - Gerenciamento de serviços systemd (status, start, stop, restart, enable, disable)
+- **`log_analysis`** - Análise de logs com filtros (system, auth, kernel, aplicações)
+- **`disk_cleanup`** - Limpeza segura de disco (modo conservador ou agressivo)
 
 ## 📦 Compilação
 
@@ -161,7 +183,9 @@ npx @modelcontextprotocol/inspector /caminho/completo/para/linux-mcp
 
 ## 📚 Exemplos de Uso
 
-### Obter informações completas do sistema
+### 🛠️ Tools
+
+#### Obter informações completas do sistema
 
 ```json
 {
@@ -172,7 +196,7 @@ npx @modelcontextprotocol/inspector /caminho/completo/para/linux-mcp
 }
 ```
 
-### Obter apenas informações de CPU
+#### Obter apenas informações de CPU
 
 ```json
 {
@@ -183,7 +207,7 @@ npx @modelcontextprotocol/inspector /caminho/completo/para/linux-mcp
 }
 ```
 
-### Executar comando normal (sem root)
+#### Executar comando normal (sem root)
 
 ```json
 {
@@ -195,7 +219,7 @@ npx @modelcontextprotocol/inspector /caminho/completo/para/linux-mcp
 }
 ```
 
-### ⭐ Executar comando com PolicyKit (para comandos que precisam de root)
+#### ⭐ Executar comando com PolicyKit (para comandos que precisam de root)
 
 ```json
 {
@@ -210,7 +234,131 @@ npx @modelcontextprotocol/inspector /caminho/completo/para/linux-mcp
 
 **Resultado**: Janela nativa do sistema pede senha → comando executado com segurança ✅
 
-**O que acontece**: Uma **janela gráfica oficial do sistema** aparece pedindo sua senha de administrador (igual quando você instala programas pela Central de Aplicativos).
+**O que acontece**: Uma **janela gráfica oficial do sistema** aparece pedendo sua senha de administrador (igual quando você instala programas pela Central de Aplicativos).
+
+### 📚 Resources
+
+Resources fornecem acesso direto a informações do sistema sem executar comandos:
+
+#### Ler logs do sistema
+
+```json
+{
+  "method": "resources/read",
+  "params": {
+    "uri": "linux://logs/system"
+  }
+}
+```
+
+#### Ver configuração de rede
+
+```json
+{
+  "method": "resources/read",
+  "params": {
+    "uri": "linux://config/network"
+  }
+}
+```
+
+#### Verificar processos com mais uso de memória
+
+```json
+{
+  "method": "resources/read",
+  "params": {
+    "uri": "linux://processes/top"
+  }
+}
+```
+
+#### Status geral do sistema
+
+```json
+{
+  "method": "resources/read",
+  "params": {
+    "uri": "linux://system/status"
+  }
+}
+```
+
+### 💡 Prompts
+
+Prompts guiam você através de tarefas comuns de administração:
+
+#### Troubleshooting de CPU
+
+```json
+{
+  "method": "prompts/get",
+  "params": {
+    "name": "system_troubleshooting",
+    "arguments": {
+      "problem_type": "cpu"
+    }
+  }
+}
+```
+
+#### Auditoria de segurança completa
+
+```json
+{
+  "method": "prompts/get",
+  "params": {
+    "name": "security_audit",
+    "arguments": {
+      "scope": "full"
+    }
+  }
+}
+```
+
+#### Gerenciar serviço nginx
+
+```json
+{
+  "method": "prompts/get",
+  "params": {
+    "name": "service_management",
+    "arguments": {
+      "service_name": "nginx",
+      "action": "restart"
+    }
+  }
+}
+```
+
+#### Analisar logs de autenticação
+
+```json
+{
+  "method": "prompts/get",
+  "params": {
+    "name": "log_analysis",
+    "arguments": {
+      "log_type": "auth",
+      "priority": "warning"
+    }
+  }
+}
+```
+
+#### Limpeza agressiva de disco
+
+```json
+{
+  "method": "prompts/get",
+  "params": {
+    "name": "disk_cleanup",
+    "arguments": {
+      "aggressive": "true"
+    }
+  }
+}
+```
 
 #### ⚠️ IMPORTANTE: Adicione `use_polkit: true` para comandos root
 
