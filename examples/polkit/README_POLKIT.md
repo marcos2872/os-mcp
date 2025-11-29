@@ -105,8 +105,7 @@ polkit.addRule(function (action, subject) {
 {
   "name": "execute_command",
   "arguments": {
-    "command": "systemctl",
-    "args": ["status", "nginx"],
+    "command": "systemctl status nginx",
     "use_polkit": true
   }
 }
@@ -120,8 +119,7 @@ Isso abrirá uma janela de autenticação gráfica solicitando a senha do admini
 
 ```json
 {
-  "command": "systemctl",
-  "args": ["restart", "nginx"],
+  "command": "systemctl restart nginx",
   "use_sudo": true,
   "sudo_password": "minhasenha123"
 }
@@ -131,8 +129,7 @@ Isso abrirá uma janela de autenticação gráfica solicitando a senha do admini
 
 ```json
 {
-  "command": "systemctl",
-  "args": ["restart", "nginx"],
+  "command": "systemctl restart nginx",
   "use_polkit": true
 }
 ```
@@ -310,8 +307,7 @@ pkexec systemctl status nginx
 {
   "name": "execute_command",
   "arguments": {
-    "command": "systemctl",
-    "args": ["restart", "nginx"],
+    "command": "systemctl restart nginx",
     "use_polkit": true
   }
 }

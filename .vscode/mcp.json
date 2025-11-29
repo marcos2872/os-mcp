@@ -1,7 +1,7 @@
 {
   "servers": {
     "linux-mcp": {
-      "command": "/home/marcos/Documents/Pessoal/linux-mcp/target/release/linux-mcp",
+      "command": "/home/marcos/Documents/os-mcp/target/release/linux-mcp",
       "args": [],
       "env": {}
     }

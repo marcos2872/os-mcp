@@ -8,8 +8,7 @@
 {
   "name": "execute_command",
   "arguments": {
-    "command": "apt",
-    "args": ["update"],
+    "command": "apt update",
     "use_polkit": true
   }
 }
@@ -31,8 +30,7 @@
 {
   "name": "execute_command",
   "arguments": {
-    "command": "apt",
-    "args": ["update"],
+    "command": "apt update",
     "use_polkit": true
   }
 }
@@ -44,8 +42,7 @@
 {
   "name": "execute_command",
   "arguments": {
-    "command": "apt",
-    "args": ["install", "-y", "nginx"],
+    "command": "apt install -y nginx",
     "use_polkit": true
   }
 }
@@ -57,8 +54,7 @@
 {
   "name": "execute_command",
   "arguments": {
-    "command": "systemctl",
-    "args": ["restart", "nginx"],
+    "command": "systemctl restart nginx",
     "use_polkit": true
   }
 }
@@ -70,8 +66,7 @@
 {
   "name": "execute_command",
   "arguments": {
-    "command": "systemctl",
-    "args": ["status", "nginx"],
+    "command": "systemctl status nginx",
     "use_polkit": true
   }
 }
@@ -83,8 +78,7 @@
 {
   "name": "execute_command",
   "arguments": {
-    "command": "journalctl",
-    "args": ["-n", "50", "-u", "nginx"],
+    "command": "journalctl -n 50 -u nginx",
     "use_polkit": true
   }
 }
@@ -96,8 +90,7 @@
 {
   "name": "execute_command",
   "arguments": {
-    "command": "docker",
-    "args": ["ps", "-a"],
+    "command": "docker ps -a",
     "use_polkit": true
   }
 }
@@ -109,8 +102,7 @@
 {
   "name": "execute_command",
   "arguments": {
-    "command": "ip",
-    "args": ["addr", "show"],
+    "command": "ip addr show",
     "use_polkit": true
   }
 }
@@ -124,8 +116,7 @@
 {
   "name": "execute_command",
   "arguments": {
-    "command": "ls",
-    "args": ["-la", "/home"]
+    "command": "ls -la /home"
   }
 }
 ```
@@ -134,8 +125,7 @@
 {
   "name": "execute_command",
   "arguments": {
-    "command": "ps",
-    "args": ["aux"]
+    "command": "ps aux"
   }
 }
 ```
@@ -144,8 +134,7 @@
 {
   "name": "execute_command",
   "arguments": {
-    "command": "df",
-    "args": ["-h"]
+    "command": "df -h"
   }
 }
 ```
@@ -222,14 +211,12 @@
 ```json
 // ❌ ERRADO
 {
-  "command": "apt",
-  "args": ["update"]
+  "command": "apt update"
 }
 
 // ✅ CORRETO
 {
-  "command": "apt",
-  "args": ["update"],
+  "command": "apt update",
   "use_polkit": true
 }
 ```

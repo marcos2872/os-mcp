@@ -22,8 +22,6 @@ pub struct SystemInfoArgs {
 #[schemars(crate = "rmcp::schemars")]
 pub struct ExecuteCommandArgs {
     pub command: String,
-    #[serde(default)]
-    pub args: Option<Vec<String>>,
     /// Se true, usa PolicyKit (pkexec) para autenticação com interface gráfica
     #[serde(default)]
     pub use_polkit: Option<bool>,
@@ -155,11 +153,8 @@ pub async fn execute_command(args: ExecuteCommandArgs) -> Result<CallToolResult,
 
 /// Executa um comando normal sem elevação de privilégios
 async fn execute_normal_command(args: &ExecuteCommandArgs) -> Result<CallToolResult, ErrorData> {
-    let mut cmd = Command::new(&args.command);
-
-    if let Some(cmd_args) = &args.args {
-        cmd.args(cmd_args);
-    }
+    let mut cmd = Command::new("sh");
+    cmd.arg("-c").arg(&args.command);
 
     let output = cmd.output().map_err(|e| {
         ErrorData::new(
@@ -170,7 +165,7 @@ async fn execute_normal_command(args: &ExecuteCommandArgs) -> Result<CallToolRes
     })?;
 
     let result = json!({
-        "command": format!("{} {}", args.command, args.args.clone().unwrap_or_default().join(" ")),
+        "command": args.command,
         "elevation_method": "none",
         "exit_code": output.status.code().unwrap_or(-1),
         "stdout": String::from_utf8_lossy(&output.stdout).to_string(),
@@ -206,13 +201,8 @@ async fn execute_polkit_command(args: &ExecuteCommandArgs) -> Result<CallToolRes
         ));
     }
 
-    let mut pkexec_args = vec![args.command.clone()];
-    if let Some(cmd_args) = &args.args {
-        pkexec_args.extend(cmd_args.clone());
-    }
-
     let mut cmd = Command::new("pkexec");
-    cmd.args(&pkexec_args);
+    cmd.arg("sh").arg("-c").arg(&args.command);
 
     // Importante: pkexec precisa de um ambiente gráfico ou dbus para funcionar
     // Define variáveis de ambiente necessárias
@@ -235,7 +225,7 @@ async fn execute_polkit_command(args: &ExecuteCommandArgs) -> Result<CallToolRes
     })?;
 
     let result = json!({
-        "command": format!("pkexec {} {}", args.command, args.args.clone().unwrap_or_default().join(" ")),
+        "command": format!("pkexec {}", args.command),
         "elevation_method": "pkexec (PolicyKit)",
         "exit_code": output.status.code().unwrap_or(-1),
         "stdout": String::from_utf8_lossy(&output.stdout).to_string(),

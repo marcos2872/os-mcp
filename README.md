@@ -22,8 +22,7 @@ Servidor MCP (Model Context Protocol) em Rust que fornece ferramentas para obter
 {
   "name": "execute_command",
   "arguments": {
-    "command": "apt",
-    "args": ["update"],
+    "command": "apt update",
     "use_polkit": true
   }
 }
@@ -37,8 +36,7 @@ Servidor MCP (Model Context Protocol) em Rust que fornece ferramentas para obter
 
 ```json
 {
-  "command": "apt",
-  "args": ["update"]
+  "command": "apt update"
 }
 ```
 
@@ -46,11 +44,15 @@ Servidor MCP (Model Context Protocol) em Rust que fornece ferramentas para obter
 
 ```json
 {
-  "command": "apt",
-  "args": ["update"],
+  "command": "apt update",
   "use_polkit": true
 }
 ```
+
+"use_polkit": true
+}
+
+````
 
 ---
 
@@ -67,7 +69,7 @@ Servidor MCP (Model Context Protocol) em Rust que fornece ferramentas para obter
 
 - **execute_command**: Executa comandos no terminal
   - Retorna stdout, stderr e código de saída
-  - Suporta argumentos para comandos
+  - Comando completo passado como string única
   - **2 modos de execução**:
     - **Normal** (padrão): executa com permissões do usuário atual
     - **PolicyKit** (`use_polkit: true`): usa pkexec com diálogo gráfico nativo do sistema - RECOMENDADO para comandos que precisam de root
@@ -97,7 +99,7 @@ Guias assistidos para tarefas comuns de administração:
 
 ```bash
 cargo build --release
-```
+````
 
 O binário será gerado em `target/release/linux-mcp`
 
@@ -213,8 +215,7 @@ npx @modelcontextprotocol/inspector /caminho/completo/para/linux-mcp
 {
   "name": "execute_command",
   "arguments": {
-    "command": "ls",
-    "args": ["-la", "/home"]
+    "command": "ls -la /home"
   }
 }
 ```
@@ -225,8 +226,7 @@ npx @modelcontextprotocol/inspector /caminho/completo/para/linux-mcp
 {
   "name": "execute_command",
   "arguments": {
-    "command": "apt",
-    "args": ["update"],
+    "command": "apt update",
     "use_polkit": true
   }
 }
@@ -364,10 +364,10 @@ Prompts guiam você através de tarefas comuns de administração:
 
 Comandos que precisam de root (como `apt update`, `systemctl restart`, etc.) **devem** incluir um método de elevação:
 
-| Comando sem elevação ❌                                | Comando correto ✅                                                         |
-| ------------------------------------------------------ | -------------------------------------------------------------------------- |
-| `"command": "apt", "args": ["update"]`                 | `"command": "apt", "args": ["update"], "use_polkit": true`                 |
-| `"command": "systemctl", "args": ["restart", "nginx"]` | `"command": "systemctl", "args": ["restart", "nginx"], "use_polkit": true` |
+| Comando sem elevação ❌                | Comando correto ✅                                         |
+| -------------------------------------- | ---------------------------------------------------------- |
+| `"command": "apt update"`              | `"command": "apt update", "use_polkit": true`              |
+| `"command": "systemctl restart nginx"` | `"command": "systemctl restart nginx", "use_polkit": true` |
 
 ✅ **PolicyKit é mais seguro**: Apresenta um diálogo gráfico de autenticação e permite controle granular de permissões. Veja [Guia Completo de PolicyKit](examples/polkit/README_POLKIT.md) para instruções detalhadas.
 
@@ -411,8 +411,7 @@ systemctl status polkit
 {
   "name": "execute_command",
   "arguments": {
-    "command": "systemctl",
-    "args": ["restart", "nginx"],
+    "command": "systemctl restart nginx",
     "use_polkit": true
   }
 }
@@ -558,8 +557,7 @@ journalctl -u polkit -f
 
 ```json
 {
-  "command": "apt",
-  "args": ["update"],
+  "command": "apt update",
   "use_polkit": true // ← ADICIONE ISSO!
 }
 ```
