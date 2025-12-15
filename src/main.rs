@@ -83,7 +83,9 @@ impl ServerHandler for LinuxMcpServer {
                  - security_audit: Auditoria básica de segurança\n\
                  - service_management: Gerenciamento de serviços systemd\n\
                  - log_analysis: Análise de logs do sistema\n\
-                 - disk_cleanup: Limpeza segura de disco"
+                 - disk_cleanup: Limpeza segura de disco\n\n\
+                 🛡️ MODO SEGURO ATIVO: Este servidor restringe a execução de comandos.\n\
+                 Consulte o resource 'linux://mcp/capabilities' para ver a lista de comandos permitidos e regras de segurança."
                     .to_string(),
             ),
         }

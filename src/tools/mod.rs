@@ -144,7 +144,7 @@ pub async fn get_system_info(
 
 /// Lista de comandos permitidos (Allowlist)
 /// Apenas o binário principal é verificado, não os argumentos.
-const ALLOWED_COMMANDS: &[&str] = &[
+pub const ALLOWED_COMMANDS: &[&str] = &[
     // Info do Sistema
     "ls", "cat", "grep", "find", "ps", "top", "htop", "free", "df", "du", "uname", "hostname", "uptime", "stat",
     // Logs

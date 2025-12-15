@@ -68,6 +68,18 @@ pub fn list_resources() -> Vec<Annotated<RawResource>> {
             },
             None,
         ),
+        Annotated::new(
+            RawResource {
+                uri: "linux://mcp/capabilities".to_string(),
+                name: "MCP Capabilities".to_string(),
+                title: Some("MCP Capabilities & Security Rules".to_string()),
+                description: Some("Lista de comandos permitidos e regras de segurança".to_string()),
+                mime_type: Some("text/plain".to_string()),
+                size: None,
+                icons: None,
+            },
+            None,
+        ),
     ]
 }
 
@@ -134,6 +146,32 @@ pub async fn read_resource(uri: &str) -> Result<String> {
                 used_mem / 1024 / 1024,
                 total_mem / 1024 / 1024,
                 System::uptime()
+            ))
+        }
+        "linux://mcp/capabilities" => {
+            let mut allowed = crate::tools::ALLOWED_COMMANDS.to_vec();
+            allowed.sort();
+
+            Ok(format!(
+               "# Linux MCP Server Security & Capabilities\n\n\
+                ## 🛡️ Security Rules\n\
+                This server operates in a secure mode. Arbitrary command execution is BLOCKED.\n\n\
+                ### 1. Allowed Commands\n\
+                Only the following commands can be executed:\n\
+                {}\n\n\
+                ### 2. Forbidden Actions\n\
+                - ❌ `rm` (Blocked by default, see Safe RM exceptions below)\n\
+                - ❌ `curl`, `wget`, `ssh` (Network exfiltration blocked)\n\
+                - ❌ `/etc/shadow`, `~/.ssh` (Sensitive data access blocked)\n\n\
+                ### 3. Safe RM Policy\n\
+                The `rm` command is ALLOWED only for recursively deleting files in:\n\
+                - ✅ `/tmp/*`\n\
+                - ✅ `/var/tmp/*`\n\
+                - ✅ `/var/log/*`\n\
+                - ✅ `~/.cache/*`\n\
+                - ✅ `~/.local/share/Trash/*`\n\n\
+                **Any other `rm` usage will be rejected.**",
+                allowed.join(", ")
             ))
         }
         _ => Err(anyhow::anyhow!("Unknown resource: {}", uri)),

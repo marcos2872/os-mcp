@@ -62,46 +62,40 @@ Definidas em `src/tools/`:
 
 ### Resources (Recursos)
 Definidos em `src/resources/`:
+- `linux://mcp/capabilities` - **NOVO**: Lista comandos permitidos e regras de segurança
 - `linux://logs/system` - Logs do sistema
 - `linux://logs/auth` - Logs de autenticação
 - `linux://config/network` - Configuração de rede
 - `linux://processes/top` - Top processos por memória
 - `linux://system/status` - Status geral
 
-### Prompts (Fluxos)
-Definidos em `src/prompts/`:
-- `system_troubleshooting` - Diagnóstico de problemas
-- `security_audit` - Auditoria de segurança
-- `service_management` - Gerenciamento de serviços
-- `log_analysis` - Análise de logs
-- `disk_cleanup` - Limpeza de disco
-
-## ⚠️ Diretrizes para Modificações
-
-### Ao adicionar novas Tools:
-1. Crie a implementação em `src/tools/`
-2. Registre a tool no `#[tool_router] impl LinuxMcpServer`
-3. Use a macro `#[tool(description = "...")]` para documentação
-4. Defina os argumentos como struct com `#[derive(serde::Deserialize)]`
-
-### Ao adicionar novos Resources:
-1. Implemente em `src/resources/`
-2. Adicione à lista em `list_resources()`
-3. Adicione o handler em `read_resource()`
-4. Use URIs no formato `linux://categoria/nome`
-
-### Ao adicionar novos Prompts:
-1. Implemente em `src/prompts/`
-2. Adicione à lista em `list_prompts()`
-3. Adicione o handler em `get_prompt()`
+<!-- ... -->
 
 ## 🔐 Segurança
 
-**Pontos críticos de segurança:**
-- O `execute_command` pode executar qualquer comando - sempre validar inputs
-- Comandos que precisam de root devem usar `use_polkit: true`
-- Nunca armazenar ou transmitir senhas pelo MCP
-- PolicyKit gerencia autenticação de forma segura
+**Modo de Operação Seguro (Ativo):**
+
+1.  **Allowlist de Comandos**:
+    - O servidor rejeita qualquer comando que não esteja na lista explícita (`src/tools/mod.rs`).
+    - Comandos permitidos incluem: `ls`, `grep`, `apt`, `systemctl`, etc.
+    - Para ver a lista completa, leia o resource `linux://mcp/capabilities`.
+
+2.  **Política de Safe RM**:
+    - O comando `rm` é **bloqueado** por padrão.
+    - Exceção: Permitido apenas para limpeza recursiva em diretórios seguros:
+        - `/tmp/*`, `/var/tmp/*`
+        - `/var/log/*`
+        - `~/.cache/*`
+        - `~/.local/share/Trash/*`
+    - Qualquer tentativa de `rm` fora desses caminhos (ex: `/etc`, `/home`) falhará.
+
+3.  **PolicyKit**:
+    - Comandos administrativos (como `apt update`) exigem `use_polkit: true`.
+    - Isso abre uma janela nativa no sistema do usuário para autenticação de senha.
+
+4.  **Agentes de IA**:
+    - Antes de executar tarefas complexas, **sempre consulte `linux://mcp/capabilities`**.
+    - Isso evita tentativas frustradas de executar comandos bloqueados.
 
 ## 🧪 Testando
 
