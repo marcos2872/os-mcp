@@ -59,6 +59,21 @@ npx @modelcontextprotocol/inspector ./target/release/linux-mcp
 
 ---
 
+## 🛠️ Configuração Avançada
+
+O servidor cria automaticamente arquivos de configuração em `~/.config/linux-mcp/`:
+
+1.  **`config.toml`** (Allowlist Dinâmica):
+    *   Lista de comandos permitidos.
+    *   Você pode editar este arquivo para adicionar/remover comandos sem recompilar.
+    *   Reinicie o servidor após editar.
+
+2.  **`audit.log`** (Audit Trail):
+    *   Registro completo de todos os comandos executados.
+    *   Mostra data, hora, comando, status (ALLOWED/BLOCKED) e detalhes.
+
+---
+
 ## 📚 Exemplos de Uso
 
 ### 1. Ver Informações do Sistema

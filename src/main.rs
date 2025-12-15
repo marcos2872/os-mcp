@@ -1,3 +1,5 @@
+mod audit;
+mod config;
 mod prompts;
 mod resources;
 mod tools;
@@ -12,20 +14,23 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use sysinfo::System;
 use tokio::sync::Mutex;
+use config::Config;
 
 /// Servidor MCP Linux
 #[derive(Clone)]
 pub struct LinuxMcpServer {
     tool_router: ToolRouter<Self>,
     system: Arc<Mutex<System>>,
+    config: Arc<Config>,
 }
 
 #[tool_router]
 impl LinuxMcpServer {
-    fn new() -> Self {
+    fn new(config: Config) -> Self {
         Self {
             tool_router: Self::tool_router(),
             system: Arc::new(Mutex::new(System::new_all())),
+            config: Arc::new(config),
         }
     }
 
@@ -51,7 +56,7 @@ impl LinuxMcpServer {
         &self,
         Parameters(args): Parameters<tools::ExecuteCommandArgs>,
     ) -> Result<CallToolResult, ErrorData> {
-        tools::execute_command(args).await
+        tools::execute_command(args, self.config.clone()).await
     }
 }
 
@@ -166,8 +171,11 @@ impl ServerHandler for LinuxMcpServer {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Carregar configuração
+    let config = config::load()?;
+
     // Criar o servidor
-    let server = LinuxMcpServer::new();
+    let server = LinuxMcpServer::new(config);
 
     // Criar transporte stdio (stdin/stdout)
     let transport = (tokio::io::stdin(), tokio::io::stdout());

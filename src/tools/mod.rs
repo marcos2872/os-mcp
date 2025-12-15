@@ -198,9 +198,8 @@ fn is_safe_rm(command_line: &str) -> bool {
 }
 
 /// Verifica se um comando é permitido
-fn is_command_allowed(command_line: &str) -> bool {
+fn is_command_allowed(command_line: &str, allowed_list: &[String]) -> bool {
     let parts: Vec<&str> = command_line.trim().split_whitespace().collect();
-    
     if let Some(cmd) = parts.first() {
         // Remove caminhos absolutos se houver (ex: /usr/bin/ls -> ls)
         let cmd_name = std::path::Path::new(cmd)
@@ -213,30 +212,64 @@ fn is_command_allowed(command_line: &str) -> bool {
             return is_safe_rm(command_line);
         }
         
-        return ALLOWED_COMMANDS.contains(&cmd_name);
+        return allowed_list.iter().any(|s| s == cmd_name);
     }
     false
 }
 
 /// Executa um comando no terminal
-pub async fn execute_command(args: ExecuteCommandArgs) -> Result<CallToolResult, ErrorData> {
-    // Validação de Segurança: Allowlist
-    if !is_command_allowed(&args.command) {
-         return Err(ErrorData::new(
+pub async fn execute_command(
+    args: ExecuteCommandArgs,
+    config: Arc<crate::config::Config>,
+) -> Result<CallToolResult, ErrorData> {
+    // Validação de Segurança: Allowlist Dinâmica
+    if !is_command_allowed(&args.command, &config.allowed_commands) {
+        let _ = crate::audit::log_command(
+            &config.log_path,
+            &args.command,
+            "BLOCKED",
+            Some("Command not in allowlist"),
+        );
+        return Err(ErrorData::new(
             ErrorCode::INVALID_PARAMS,
             format!(
-                "Comando não permitido por segurança. O comando '{}' não está na lista de permitidos (Allowlist).", 
+                "Comando não permitido por segurança. O comando '{}' não está na lista de permitidos (Allowlist).",
                 args.command
             ),
             None,
         ));
     }
 
-    if args.use_polkit.unwrap_or(false) {
+    // Log de execução iniciada
+    let _ = crate::audit::log_command(
+        &config.log_path,
+        &args.command,
+        "ALLOWED",
+        args.use_polkit.map(|b| if b { Some("polkit") } else { Some("normal") }).unwrap_or(Some("normal")),
+    );
+
+    let result = if args.use_polkit.unwrap_or(false) {
         execute_polkit_command(&args).await
     } else {
         execute_normal_command(&args).await
+    };
+
+    // Log de resultado
+    match &result {
+        Ok(_) => {
+            let _ = crate::audit::log_command(&config.log_path, &args.command, "SUCCESS", None);
+        }
+        Err(e) => {
+            let _ = crate::audit::log_command(
+                &config.log_path,
+                &args.command,
+                "ERROR",
+                Some(&e.message),
+            );
+        }
     }
+
+    result
 }
 
 /// Executa um comando normal sem elevação de privilégios
@@ -338,16 +371,25 @@ mod tests {
 
     #[test]
     fn test_is_command_allowed() {
+        let allowed = vec![
+            "ls".to_string(),
+            "grep".to_string(),
+            "apt".to_string(),
+        ];
+
         // Allowed commands
-        assert!(is_command_allowed("ls -la"));
-        assert!(is_command_allowed("grep 'foo' bar.txt"));
-        assert!(is_command_allowed("apt update"));
-        assert!(is_command_allowed("/usr/bin/ls")); // Absolute path
+        assert!(is_command_allowed("ls -la", &allowed));
+        assert!(is_command_allowed("grep 'foo' bar.txt", &allowed));
+        assert!(is_command_allowed("apt update", &allowed));
+        // Note: "/usr/bin/ls" check depends on how we strip paths. 
+        // Logic: std::path::Path::new("/usr/bin/ls").file_name() -> "ls".
+        // So it should match if "ls" is in allowed.
+        assert!(is_command_allowed("/usr/bin/ls", &allowed)); 
         
         // Blocked commands
-        assert!(!is_command_allowed("rm -rf /"));
-        assert!(!is_command_allowed("chmod 777 file"));
-        assert!(!is_command_allowed("./script.sh"));
-        assert!(!is_command_allowed("python3 script.py"));
+        assert!(!is_command_allowed("rm -rf /", &allowed)); // rm is special but here mocked list doesn't matter for rm logic as rm logic is hardcoded inside is_command_allowed calling is_safe_rm
+        assert!(!is_command_allowed("chmod 777 file", &allowed));
+        assert!(!is_command_allowed("./script.sh", &allowed));
+        assert!(!is_command_allowed("python3 script.py", &allowed));
     }
 }

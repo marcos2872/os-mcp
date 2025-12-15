@@ -15,3 +15,6 @@ anyhow = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 nix = { version = "0.30.1", features = ["user"] }
+dirs = "6.0.0"
+toml = "0.9.8"
+chrono = "0.4.42"
