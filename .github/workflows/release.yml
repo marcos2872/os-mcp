@@ -33,9 +33,20 @@ jobs:
           mv target/release/linux-mcp .
           tar -czvf linux-mcp-x86_64-unknown-linux-gnu.tar.gz linux-mcp
 
+      - name: Extract Changelog
+        id: changelog
+        shell: bash
+        run: |
+          sed -n "/^## \[${GITHUB_REF_NAME}\]/,/^## \[/p" CHANGELOG.md | sed '1d;$d' > RELEASE_BODY.md
+          if [ ! -s RELEASE_BODY.md ]; then
+            echo "RELEASE_BODY.md is empty, using default message."
+            echo "Release ${GITHUB_REF_NAME}" > RELEASE_BODY.md
+          fi
+
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
+          body_path: RELEASE_BODY.md
           files: |
             linux-mcp
             linux-mcp-x86_64-unknown-linux-gnu.tar.gz
