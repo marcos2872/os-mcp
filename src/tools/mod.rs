@@ -142,8 +142,96 @@ pub async fn get_system_info(
     )]))
 }
 
+/// Lista de comandos permitidos (Allowlist)
+/// Apenas o binário principal é verificado, não os argumentos.
+const ALLOWED_COMMANDS: &[&str] = &[
+    // Info do Sistema
+    "ls", "cat", "grep", "find", "ps", "top", "htop", "free", "df", "du", "uname", "hostname", "uptime", "stat",
+    // Logs
+    "journalctl", "dmesg", "tail", "head",
+    // Rede
+    "ip", "ifconfig", "ping", "ss", "netstat", "lsof",
+    // Gerenciamento de Serviços (Requer Polkit/Root geralmente)
+    "systemctl", "service",
+    // Gerenciamento de Pacotes (Requer Polkit/Root)
+    "apt", "apt-get", "dnf", "yum", "pacman", "zypper", "snap", "flatpak",
+    // Outros utilitários seguros
+    "echo", "date", "whoami", "id", "wc", "sort", "uniq",
+];
+
+/// Verifica se o comando rm é seguro
+fn is_safe_rm(command_line: &str) -> bool {
+    // Separa os argumentos
+    let parts: Vec<&str> = command_line.trim().split_whitespace().collect();
+    
+    // Ignora o binário "rm" e flags
+    let targets: Vec<&str> = parts.iter()
+        .skip(1) // Pula "rm"
+        .filter(|arg| !arg.starts_with('-')) // Remove flags como -rf
+        .map(|s| *s)
+        .collect();
+
+    if targets.is_empty() {
+        return false; // rm sem argumentos ou so com flags é perigoso/inútil
+    }
+
+    // Todos os alvos devem ser seguros
+    for target in targets {
+        // Bloqueia directory traversal explícito
+        if target.contains("..") {
+            return false;
+        }
+
+        // Verifica prefixos permitidos
+        let is_safe = target.starts_with("/tmp/") ||
+                      target.starts_with("/var/tmp/") ||
+                      target.starts_with("/var/log/") ||
+                      target.contains("/.cache/") || // Cobre /home/user/.cache e /root/.cache
+                      target.contains("/.local/share/Trash/");
+        
+        if !is_safe {
+            return false;
+        }
+    }
+
+    true
+}
+
+/// Verifica se um comando é permitido
+fn is_command_allowed(command_line: &str) -> bool {
+    let parts: Vec<&str> = command_line.trim().split_whitespace().collect();
+    
+    if let Some(cmd) = parts.first() {
+        // Remove caminhos absolutos se houver (ex: /usr/bin/ls -> ls)
+        let cmd_name = std::path::Path::new(cmd)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or(*cmd);
+        
+        // Exceção especial para o rm
+        if cmd_name == "rm" {
+            return is_safe_rm(command_line);
+        }
+        
+        return ALLOWED_COMMANDS.contains(&cmd_name);
+    }
+    false
+}
+
 /// Executa um comando no terminal
 pub async fn execute_command(args: ExecuteCommandArgs) -> Result<CallToolResult, ErrorData> {
+    // Validação de Segurança: Allowlist
+    if !is_command_allowed(&args.command) {
+         return Err(ErrorData::new(
+            ErrorCode::INVALID_PARAMS,
+            format!(
+                "Comando não permitido por segurança. O comando '{}' não está na lista de permitidos (Allowlist).", 
+                args.command
+            ),
+            None,
+        ));
+    }
+
     if args.use_polkit.unwrap_or(false) {
         execute_polkit_command(&args).await
     } else {
@@ -242,4 +330,24 @@ async fn execute_polkit_command(args: &ExecuteCommandArgs) -> Result<CallToolRes
             )
         })?,
     )]))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_command_allowed() {
+        // Allowed commands
+        assert!(is_command_allowed("ls -la"));
+        assert!(is_command_allowed("grep 'foo' bar.txt"));
+        assert!(is_command_allowed("apt update"));
+        assert!(is_command_allowed("/usr/bin/ls")); // Absolute path
+        
+        // Blocked commands
+        assert!(!is_command_allowed("rm -rf /"));
+        assert!(!is_command_allowed("chmod 777 file"));
+        assert!(!is_command_allowed("./script.sh"));
+        assert!(!is_command_allowed("python3 script.py"));
+    }
 }

@@ -255,10 +255,10 @@ pub fn get_prompt(name: &str, arguments: HashMap<String, String>) -> Result<GetP
 
             if aggressive {
                 cleanup_steps.extend_from_slice(&[
-                    "5. Limpar cache do pip: pip cache purge",
-                    "6. Limpar arquivos temporários: rm -rf /tmp/*",
-                    "7. Limpar cache do npm: npm cache clean --force",
-                    "8. Limpar logs rotacionados antigos: find /var/log -name '*.gz' -delete",
+                    "5. Limpar arquivos temporários (Seguro): rm -rf /tmp/* /var/tmp/*",
+                    "6. Limpar cache do usuário (Seguro): rm -rf ~/.cache/*",
+                    "7. Esvaziar Lixeira (Seguro): rm -rf ~/.local/share/Trash/*",
+                    "8. Limpar logs antigos: find /var/log -name '*.gz' -delete",
                 ]);
             }
 
