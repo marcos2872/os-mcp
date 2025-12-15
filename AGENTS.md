@@ -73,14 +73,20 @@ Definidos em `src/resources/`:
 
 ## 🔐 Segurança
 
+## 🔐 Segurança
+
 **Modo de Operação Seguro (Ativo):**
 
 1.  **Allowlist de Comandos**:
-    - O servidor rejeita qualquer comando que não esteja na lista explícita (`src/tools/mod.rs`).
-    - Comandos permitidos incluem: `ls`, `grep`, `apt`, `systemctl`, etc.
-    - Para ver a lista completa, leia o resource `linux://mcp/capabilities`.
+    - O servidor rejeita qualquer comando que não esteja na lista explícita.
+    - **Configuração**: A lista pode ser editada em `~/.config/linux-mcp/config.toml` (sem necessidade de recompilar).
+    - Para ver a lista ativa, leia o resource `linux://mcp/capabilities`.
 
-2.  **Política de Safe RM**:
+2.  **Audit Logging (Auditoria)**:
+    - 👁️ **Atenção**: Todas as execuções de comandos (permitidas ou bloqueadas) são registradas em `~/.config/linux-mcp/audit.log`.
+    - Os logs incluem timestamp, comando exato e status.
+
+3.  **Política de Safe RM**:
     - O comando `rm` é **bloqueado** por padrão.
     - Exceção: Permitido apenas para limpeza recursiva em diretórios seguros:
         - `/tmp/*`, `/var/tmp/*`
@@ -89,13 +95,23 @@ Definidos em `src/resources/`:
         - `~/.local/share/Trash/*`
     - Qualquer tentativa de `rm` fora desses caminhos (ex: `/etc`, `/home`) falhará.
 
-3.  **PolicyKit**:
+4.  **PolicyKit**:
     - Comandos administrativos (como `apt update`) exigem `use_polkit: true`.
     - Isso abre uma janela nativa no sistema do usuário para autenticação de senha.
 
-4.  **Agentes de IA**:
+5.  **Agentes de IA**:
     - Antes de executar tarefas complexas, **sempre consulte `linux://mcp/capabilities`**.
     - Isso evita tentativas frustradas de executar comandos bloqueados.
+
+## 🚀 Instalação Automatizada
+
+Para facilitar o setup em novos ambientes, use o script fornecido:
+
+```bash
+./install.sh
+```
+
+Isso compila o projeto e injeta a configuração automaticamente no Claude Desktop.
 
 ## 🧪 Testando
 
