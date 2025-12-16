@@ -64,7 +64,7 @@ impl LinuxMcpServer {
 impl ServerHandler for LinuxMcpServer {
     fn get_info(&self) -> ServerInfo {
         ServerInfo {
-            protocol_version: ProtocolVersion::V_2024_11_05,
+            protocol_version: ProtocolVersion::LATEST,
             capabilities: ServerCapabilities::builder()
                 .enable_tools()
                 .enable_resources()
