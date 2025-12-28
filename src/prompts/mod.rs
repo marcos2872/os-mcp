@@ -1,5 +1,5 @@
 use anyhow::Result;
-use rmcp::model::{GetPromptResult, Prompt, PromptArgument, PromptMessage, PromptMessageRole};
+use rmcp::model::{GetPromptResult, Prompt, PromptMessage, PromptMessageRole};
 use std::collections::HashMap;
 
 pub fn list_prompts() -> Vec<Prompt> {
@@ -11,280 +11,142 @@ pub fn list_prompts() -> Vec<Prompt> {
                 "Guia interativo para diagnóstico e solução de problemas no sistema Linux"
                     .to_string(),
             ),
-            arguments: Some(vec![PromptArgument {
-                name: "problem_type".to_string(),
-                title: Some("Tipo de Problema".to_string()),
-                description: Some(
-                    "Tipo de problema: cpu, memory, disk, network, process".to_string(),
-                ),
-                required: Some(true),
-            }]),
+            arguments: None,
             icons: None,
         },
         Prompt {
             name: "security_audit".to_string(),
             title: Some("Security Audit".to_string()),
             description: Some("Realiza uma auditoria básica de segurança do sistema".to_string()),
-            arguments: Some(vec![PromptArgument {
-                name: "scope".to_string(),
-                title: Some("Escopo".to_string()),
-                description: Some("Escopo da auditoria: basic, full".to_string()),
-                required: Some(false),
-            }]),
+            arguments: None,
             icons: None,
         },
         Prompt {
             name: "service_management".to_string(),
             title: Some("Service Management".to_string()),
-            description: Some("Gerenciamento de serviços systemd".to_string()),
-            arguments: Some(vec![
-                PromptArgument {
-                    name: "service_name".to_string(),
-                    title: Some("Nome do Serviço".to_string()),
-                    description: Some("Nome do serviço systemd".to_string()),
-                    required: Some(true),
-                },
-                PromptArgument {
-                    name: "action".to_string(),
-                    title: Some("Ação".to_string()),
-                    description: Some(
-                        "Ação: status, start, stop, restart, enable, disable".to_string(),
-                    ),
-                    required: Some(true),
-                },
-            ]),
+            description: Some("Gerenciamento de serviços do sistema".to_string()),
+            arguments: None,
             icons: None,
         },
         Prompt {
             name: "log_analysis".to_string(),
             title: Some("Log Analysis".to_string()),
             description: Some("Análise de logs do sistema com filtros e busca".to_string()),
-            arguments: Some(vec![
-                PromptArgument {
-                    name: "log_type".to_string(),
-                    title: Some("Tipo de Log".to_string()),
-                    description: Some("Tipo de log: system, auth, kernel, app".to_string()),
-                    required: Some(true),
-                },
-                PromptArgument {
-                    name: "priority".to_string(),
-                    title: Some("Prioridade".to_string()),
-                    description: Some(
-                        "Prioridade mínima: emerg, alert, crit, err, warning, notice, info, debug"
-                            .to_string(),
-                    ),
-                    required: Some(false),
-                },
-            ]),
+            arguments: None,
             icons: None,
         },
         Prompt {
             name: "disk_cleanup".to_string(),
             title: Some("Disk Cleanup".to_string()),
             description: Some("Identificação e limpeza segura de espaço em disco".to_string()),
-            arguments: Some(vec![PromptArgument {
-                name: "aggressive".to_string(),
-                title: Some("Agressivo".to_string()),
-                description: Some("Modo agressivo (remove mais arquivos): true/false".to_string()),
-                required: Some(false),
-            }]),
+            arguments: None,
             icons: None,
         },
     ]
 }
 
-pub fn get_prompt(name: &str, arguments: HashMap<String, String>) -> Result<GetPromptResult> {
+pub fn get_prompt(name: &str, _arguments: HashMap<String, String>) -> Result<GetPromptResult> {
     match name {
         "system_troubleshooting" => {
-            let problem_type = arguments
-                .get("problem_type")
-                .map(|s| s.as_str())
-                .unwrap_or("general");
-
             let messages = vec![PromptMessage::new_text(
                 PromptMessageRole::User,
-                format!(
-                    "Preciso diagnosticar um problema de {}. Por favor, me guie através de:\n\
-                     1. Comandos para verificar o estado atual\n\
-                     2. Interpretação dos resultados\n\
-                     3. Possíveis soluções\n\
-                     4. Como prevenir o problema no futuro",
-                    problem_type
-                ),
+                "Preciso diagnosticar um problema no sistema Linux. Por favor, me ajude a:\n\n\
+                 1. Identificar o tipo de problema (CPU, memória, disco, rede, processos, etc.)\n\
+                 2. Executar comandos de diagnóstico apropriados\n\
+                 3. Interpretar os resultados\n\
+                 4. Sugerir soluções baseadas nos dados coletados\n\
+                 5. Recomendar medidas preventivas\n\n\
+                 Use comandos compatíveis com qualquer distribuição Linux (ps, top, df, free, dmesg, etc.)".to_string(),
             )];
 
             Ok(GetPromptResult {
-                description: Some(format!("Troubleshooting de problema: {}", problem_type)),
+                description: Some("Guia de troubleshooting para sistema Linux".to_string()),
                 messages,
             })
         }
         "security_audit" => {
-            let scope = arguments
-                .get("scope")
-                .map(|s| s.as_str())
-                .unwrap_or("basic");
-
-            let mut checks = vec![
-                "1. Verificar atualizações pendentes de segurança",
-                "2. Listar usuários com login ativo",
-                "3. Verificar portas abertas e serviços expostos",
-                "4. Checar logs de autenticação falhada",
-            ];
-
-            if scope == "full" {
-                checks.extend_from_slice(&[
-                    "5. Verificar permissões de arquivos críticos",
-                    "6. Listar processos com privilégios elevados",
-                    "7. Verificar configurações do firewall",
-                    "8. Analisar integridade de pacotes do sistema",
-                ]);
-            }
-
             let messages = vec![PromptMessage::new_text(
                 PromptMessageRole::User,
-                format!(
-                    "Execute uma auditoria de segurança ({} scope):\n\n{}",
-                    scope,
-                    checks.join("\n")
-                ),
+                "Execute uma auditoria de segurança abrangente do sistema Linux:\n\n\
+                 1. Verificar atualizações pendentes (detectar gerenciador de pacotes automaticamente)\n\
+                 2. Listar usuários e verificar contas suspeitas\n\
+                 3. Verificar portas abertas e serviços em execução\n\
+                 4. Analisar logs de autenticação e tentativas de login\n\
+                 5. Verificar permissões de arquivos críticos (/etc/passwd, /etc/shadow, etc.)\n\
+                 6. Listar processos com privilégios elevados\n\
+                 7. Verificar configurações de firewall (iptables/nftables/ufw)\n\
+                 8. Identificar pacotes e arquivos modificados\n\n\
+                 Use comandos genéricos que funcionem em qualquer distro Linux.".to_string(),
             )];
 
             Ok(GetPromptResult {
-                description: Some(format!("Auditoria de segurança - escopo: {}", scope)),
+                description: Some("Auditoria de segurança do sistema".to_string()),
                 messages,
             })
         }
         "service_management" => {
-            let service_name = arguments
-                .get("service_name")
-                .ok_or_else(|| anyhow::anyhow!("service_name is required"))?;
-
-            let action = arguments
-                .get("action")
-                .ok_or_else(|| anyhow::anyhow!("action is required"))?;
-
-            let command = match action.as_str() {
-                "status" => format!("systemctl status {}", service_name),
-                "start" => format!("systemctl start {}", service_name),
-                "stop" => format!("systemctl stop {}", service_name),
-                "restart" => format!("systemctl restart {}", service_name),
-                "enable" => format!("systemctl enable {}", service_name),
-                "disable" => format!("systemctl disable {}", service_name),
-                _ => return Err(anyhow::anyhow!("Invalid action: {}", action)),
-            };
-
             let messages = vec![PromptMessage::new_text(
                 PromptMessageRole::User,
-                format!(
-                    "Execute a seguinte ação no serviço '{}':\n\
-                     Ação: {}\n\
-                     Comando: {}\n\n\
-                     Por favor:\n\
-                     1. Execute o comando\n\
-                     2. Verifique o resultado\n\
-                     3. Confirme o novo status do serviço",
-                    service_name, action, command
-                ),
+                "Ajude-me a gerenciar serviços no sistema Linux:\n\n\
+                 1. Detectar o sistema de init usado (systemd, sysvinit, OpenRC, etc.)\n\
+                 2. Listar todos os serviços disponíveis\n\
+                 3. Verificar status de serviços específicos\n\
+                 4. Iniciar, parar ou reiniciar serviços conforme necessário\n\
+                 5. Habilitar ou desabilitar serviços no boot\n\
+                 6. Analisar logs dos serviços\n\
+                 7. Diagnosticar problemas de serviços que não iniciam\n\n\
+                 Adapte os comandos ao sistema de init detectado."
+                    .to_string(),
             )];
 
             Ok(GetPromptResult {
-                description: Some(format!("Gerenciar serviço: {} - {}", service_name, action)),
+                description: Some("Gerenciamento de serviços Linux".to_string()),
                 messages,
             })
         }
         "log_analysis" => {
-            let log_type = arguments
-                .get("log_type")
-                .ok_or_else(|| anyhow::anyhow!("log_type is required"))?;
-
-            let priority = arguments
-                .get("priority")
-                .map(|s| s.as_str())
-                .unwrap_or("info");
-
-            let command = match log_type.as_str() {
-                "system" => format!("journalctl -p {} -n 100 --no-pager", priority),
-                "auth" => format!("journalctl -u ssh -u sshd -p {} -n 50 --no-pager", priority),
-                "kernel" => format!("journalctl -k -p {} -n 100 --no-pager", priority),
-                "app" => {
-                    let app_name = arguments
-                        .get("app_name")
-                        .map(|s| s.as_str())
-                        .unwrap_or("apache2");
-                    format!(
-                        "journalctl -u {} -p {} -n 100 --no-pager",
-                        app_name, priority
-                    )
-                }
-                _ => return Err(anyhow::anyhow!("Invalid log_type: {}", log_type)),
-            };
-
             let messages = vec![PromptMessage::new_text(
                 PromptMessageRole::User,
-                format!(
-                    "Analise os logs do tipo '{}' com prioridade mínima '{}':\n\n\
-                     Comando sugerido: {}\n\n\
-                     Por favor:\n\
-                     1. Execute o comando\n\
-                     2. Identifique padrões ou problemas\n\
-                     3. Sugira ações corretivas se necessário",
-                    log_type, priority, command
-                ),
+                "Analise logs do sistema Linux de forma abrangente:\n\n\
+                 1. Detectar sistema de logs (journald, rsyslog, syslog-ng, etc.)\n\
+                 2. Analisar logs do sistema geral\n\
+                 3. Verificar logs de autenticação e segurança\n\
+                 4. Analisar logs do kernel (dmesg)\n\
+                 5. Verificar logs de serviços específicos\n\
+                 6. Identificar erros, avisos e mensagens críticas\n\
+                 7. Buscar padrões e anomalias\n\
+                 8. Sugerir ações corretivas baseadas nos logs\n\n\
+                 Use comandos genéricos (grep, tail, journalctl quando disponível, /var/log/, etc.)".to_string(),
             )];
 
             Ok(GetPromptResult {
-                description: Some(format!(
-                    "Análise de logs: {} (prioridade: {})",
-                    log_type, priority
-                )),
+                description: Some("Análise de logs do sistema".to_string()),
                 messages,
             })
         }
         "disk_cleanup" => {
-            let aggressive = arguments
-                .get("aggressive")
-                .map(|s| s == "true")
-                .unwrap_or(false);
-
-            let mut cleanup_steps = vec![
-                "1. Limpar cache do apt: apt clean",
-                "2. Remover pacotes órfãos: apt autoremove",
-                "3. Limpar journald logs antigos: journalctl --vacuum-time=7d",
-                "4. Encontrar arquivos grandes: find / -type f -size +100M",
-            ];
-
-            if aggressive {
-                cleanup_steps.extend_from_slice(&[
-                    "5. Limpar arquivos temporários (Seguro): rm -rf /tmp/* /var/tmp/*",
-                    "6. Limpar cache do usuário (Seguro): rm -rf ~/.cache/*",
-                    "7. Esvaziar Lixeira (Seguro): rm -rf ~/.local/share/Trash/*",
-                    "8. Limpar logs antigos: find /var/log -name '*.gz' -delete",
-                ]);
-            }
-
             let messages = vec![PromptMessage::new_text(
                 PromptMessageRole::User,
-                format!(
-                    "Executar limpeza de disco (modo {}):\n\n{}\n\n\
-                     ATENÇÃO: Revise cada comando antes de executar!",
-                    if aggressive {
-                        "agressivo"
-                    } else {
-                        "conservador"
-                    },
-                    cleanup_steps.join("\n")
-                ),
+                "Ajude-me a liberar espaço em disco de forma segura:\n\n\
+                 1. Analisar uso de disco (df, du) e identificar diretórios grandes\n\
+                 2. Detectar gerenciador de pacotes e limpar cache\n\
+                 3. Remover pacotes órfãos (se aplicável)\n\
+                 4. Limpar logs antigos de forma segura\n\
+                 5. Identificar arquivos grandes e duplicados\n\
+                 6. Limpar diretórios temporários seguros (/tmp, /var/tmp)\n\
+                 7. Limpar cache do usuário (~/.cache)\n\
+                 8. Esvaziar lixeira (~/.local/share/Trash)\n\n\
+                 IMPORTANTE:\n\
+                 - Sempre confirme antes de deletar arquivos\n\
+                 - Evite usar rm em locais não autorizados\n\
+                 - Adapte comandos ao gerenciador de pacotes detectado\n\
+                 - NÃO execute limpeza em discos removíveis (USB, SD cards, discos externos)\n\
+                 - Verifique com 'df -h' ou 'lsblk' para identificar pontos de montagem removíveis"
+                    .to_string(),
             )];
 
             Ok(GetPromptResult {
-                description: Some(format!(
-                    "Limpeza de disco - modo: {}",
-                    if aggressive {
-                        "agressivo"
-                    } else {
-                        "conservador"
-                    }
-                )),
+                description: Some("Limpeza segura de espaço em disco".to_string()),
                 messages,
             })
         }
